@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import Needle from "@/components/Needle";
 import EquityBetCard from "@/components/EquityBetCard";
 import StartupCard from "@/components/StartupCard";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { api, ThesisDetail, Feed, Effect } from "@/lib/api";
 
 export default function ThesisDetailPage() {
@@ -33,7 +34,7 @@ export default function ThesisDetailPage() {
       <main className="min-h-screen" style={{ background: "var(--bg)" }}>
         <Header />
         <div className="px-12 py-8" style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace" }}>
-          ————
+          ————————
         </div>
       </main>
     );
@@ -49,6 +50,7 @@ export default function ThesisDetailPage() {
   }
 
   return (
+    <ErrorBoundary>
     <main className="min-h-screen" style={{ background: "var(--bg)" }}>
       <Header />
       <div className="px-12 py-8">
@@ -182,6 +184,40 @@ export default function ThesisDetailPage() {
           </button>
 
           {feedsOpen && (
+            <div className="mb-3 flex items-center gap-4">
+              <button
+                onClick={async () => {
+                  await api.refreshFeeds(id);
+                  const [t, f] = await Promise.all([api.getThesis(id), api.getFeeds(id)]);
+                  setThesis(t);
+                  setFeeds(f);
+                }}
+                className="text-xs uppercase hover:underline"
+                style={{
+                  color: "var(--text-muted)",
+                  letterSpacing: "0.08em",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  textUnderlineOffset: "3px",
+                }}
+              >
+                REFRESH
+              </button>
+              {(() => {
+                const live = feeds.filter((f) => f.status === "live").length;
+                const offline = feeds.filter((f) => f.status === "offline").length;
+                const degraded = feeds.filter((f) => f.status === "degraded").length;
+                return (
+                  <span style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "11px" }}>
+                    {live} live / {feeds.length - live - offline - degraded} stale / {degraded} degraded / {offline} offline
+                  </span>
+                );
+              })()}
+            </div>
+          )}
+
+          {feedsOpen && (
             <div className="border" style={{ borderColor: "var(--border)" }}>
               {feeds.map((feed, i) => (
                 <div
@@ -287,6 +323,7 @@ export default function ThesisDetailPage() {
         )}
       </div>
     </main>
+    </ErrorBoundary>
   );
 }
 

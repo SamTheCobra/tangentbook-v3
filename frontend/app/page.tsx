@@ -5,6 +5,8 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Needle from "@/components/Needle";
 import NewThesisPanel from "@/components/NewThesisPanel";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { ThesisCardSkeleton } from "@/components/Skeleton";
 import { api, Thesis } from "@/lib/api";
 
 type FilterTab = "ALL" | "ACTIVE" | "ARCHIVED";
@@ -89,6 +91,7 @@ export default function Home() {
   };
 
   return (
+    <ErrorBoundary>
     <main className="min-h-screen" style={{ background: "var(--bg)" }}>
       <Header onNewThesis={() => setPanelOpen(true)} />
       <NewThesisPanel
@@ -99,8 +102,10 @@ export default function Home() {
 
       <div className="px-12 py-8">
         {loading ? (
-          <div style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace" }}>
-            ————
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 mt-8">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <ThesisCardSkeleton key={i} />
+            ))}
           </div>
         ) : (
           <div>
@@ -199,6 +204,7 @@ export default function Home() {
         )}
       </div>
     </main>
+    </ErrorBoundary>
   );
 }
 
