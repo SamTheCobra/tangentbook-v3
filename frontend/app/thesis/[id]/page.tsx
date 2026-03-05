@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Needle from "@/components/Needle";
+import EquityBetCard from "@/components/EquityBetCard";
+import StartupCard from "@/components/StartupCard";
 import { api, ThesisDetail, Feed, Effect } from "@/lib/api";
 
 export default function ThesisDetailPage() {
@@ -242,44 +244,7 @@ export default function ThesisDetailPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
               {thesis.equityBets.map((bet) => (
-                <div
-                  key={bet.id}
-                  className="border p-4"
-                  style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span
-                      className="font-bold"
-                      style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "16px" }}
-                    >
-                      {bet.ticker}
-                    </span>
-                    <span
-                      className="text-xs uppercase px-2 py-0.5 border"
-                      style={{
-                        color:
-                          bet.role === "BENEFICIARY"
-                            ? "var(--positive)"
-                            : bet.role === "HEADWIND"
-                            ? "var(--text-muted)"
-                            : "var(--accent)",
-                        borderColor:
-                          bet.role === "BENEFICIARY"
-                            ? "var(--positive)"
-                            : bet.role === "HEADWIND"
-                            ? "var(--text-muted)"
-                            : "var(--accent)",
-                        letterSpacing: "0.08em",
-                        fontSize: "9px",
-                      }}
-                    >
-                      {bet.role}
-                    </span>
-                  </div>
-                  <p className="text-xs" style={{ color: "var(--text-muted)", lineHeight: "1.4" }}>
-                    {bet.rationale}
-                  </p>
-                </div>
+                <EquityBetCard key={bet.id} bet={bet} />
               ))}
             </div>
           </>
@@ -297,41 +262,7 @@ export default function ThesisDetailPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
               {thesis.startupOpportunities.map((opp) => (
-                <div
-                  key={opp.id}
-                  className="border p-4"
-                  style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-sm" style={{ color: "var(--text)" }}>
-                      {opp.name}
-                    </span>
-                    <span
-                      className="text-xs uppercase px-2 py-0.5 border"
-                      style={{
-                        color:
-                          opp.timing === "RIGHT_TIMING"
-                            ? "var(--positive)"
-                            : opp.timing === "TOO_EARLY"
-                            ? "var(--text-muted)"
-                            : "var(--accent)",
-                        borderColor:
-                          opp.timing === "RIGHT_TIMING"
-                            ? "var(--positive)"
-                            : opp.timing === "TOO_EARLY"
-                            ? "var(--text-muted)"
-                            : "var(--accent)",
-                        letterSpacing: "0.08em",
-                        fontSize: "9px",
-                      }}
-                    >
-                      {opp.timing.replace("_", " ")}
-                    </span>
-                  </div>
-                  <p className="text-xs" style={{ color: "var(--text-muted)", lineHeight: "1.4" }}>
-                    {opp.oneLiner}
-                  </p>
-                </div>
+                <StartupCard key={opp.id} opportunity={opp} />
               ))}
             </div>
           </>
