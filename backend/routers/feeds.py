@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from database import get_db
+from database import get_db, SessionLocal
 from models import DataFeed, FeedCache, Thesis, MacroHeader
+from services.feed_refresh import refresh_thesis_feeds, refresh_macro_header
 
 router = APIRouter(prefix="/api", tags=["feeds"])
 
@@ -34,12 +35,29 @@ def list_feeds(thesis_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/theses/{thesis_id}/feeds/refresh")
-def refresh_feeds(thesis_id: str, db: Session = Depends(get_db)):
+async def refresh_feeds(thesis_id: str, db: Session = Depends(get_db)):
     thesis = db.query(Thesis).filter(Thesis.id == thesis_id).first()
     if not thesis:
         raise HTTPException(status_code=404, detail="Thesis not found")
-    # Actual refresh logic will be implemented in Phase 1
-    return {"status": "refresh_queued", "thesisId": thesis_id}
+    await refresh_thesis_feeds(thesis_id, db)
+    db.refresh(thesis)
+    return {
+        "status": "refreshed",
+        "thesisId": thesis_id,
+        "thiScore": thesis.thi_score,
+    }
+
+
+@router.post("/macro/refresh")
+async def refresh_macro(db: Session = Depends(get_db)):
+    await refresh_macro_header(db)
+    header = db.query(MacroHeader).order_by(MacroHeader.last_updated.desc()).first()
+    return {
+        "regime": header.regime if header else "NEUTRAL",
+        "ffr": header.ffr if header else None,
+        "tenYearTwoYearSpread": header.ten_year_two_year_spread if header else None,
+        "vix": header.vix if header else None,
+    }
 
 
 @router.get("/feeds/{feed_id}/history")
