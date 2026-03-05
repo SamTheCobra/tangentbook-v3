@@ -8,6 +8,7 @@ import Needle from "@/components/Needle";
 import EquityBetCard from "@/components/EquityBetCard";
 import StartupCard from "@/components/StartupCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import EffectChain from "@/components/EffectChain";
 import { api, ThesisDetail, Feed, Effect } from "@/lib/api";
 
 export default function ThesisDetailPage() {
@@ -305,6 +306,7 @@ export default function ThesisDetailPage() {
         )}
 
         {/* Effects */}
+        {/* Effect Chain Diagram */}
         {thesis.effects.length > 0 && (
           <>
             <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
@@ -312,40 +314,86 @@ export default function ThesisDetailPage() {
               className="text-xs uppercase mb-4"
               style={{ color: "var(--text-muted)", letterSpacing: "0.08em" }}
             >
-              2ND ORDER EFFECTS
+              EFFECT CHAIN
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
-              {thesis.effects.map((effect) => (
-                <EffectCard key={effect.id} effect={effect} />
-              ))}
+            <div className="mb-8">
+              <EffectChain
+                thesisId={thesis.id}
+                thesisTitle={thesis.title}
+                thesisScore={thesis.thi.score}
+                effects={thesis.effects}
+              />
             </div>
           </>
         )}
+
+        {/* Effects Grid */}
+        <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
+        <div className="flex items-center justify-between mb-4">
+          <h3
+            className="text-xs uppercase"
+            style={{ color: "var(--text-muted)", letterSpacing: "0.08em" }}
+          >
+            2ND ORDER EFFECTS ({thesis.effects.length})
+          </h3>
+          <AddEffectButton thesisId={thesis.id} onCreated={async () => {
+            const t = await api.getThesis(id);
+            setThesis(t);
+          }} />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
+          {thesis.effects.map((effect) => (
+            <EffectCard key={effect.id} effect={effect} thesisId={thesis.id} onUpdated={async () => {
+              const t = await api.getThesis(id);
+              setThesis(t);
+            }} />
+          ))}
+        </div>
       </div>
     </main>
     </ErrorBoundary>
   );
 }
 
-function EffectCard({ effect }: { effect: Effect }) {
+function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId: string; onUpdated: () => void }) {
   const [expanded, setExpanded] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete "${effect.title}"? This cannot be undone.`)) return;
+    await api.deleteEffect(effect.id);
+    onUpdated();
+  };
 
   return (
     <div className="border p-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
       <div className="flex items-start justify-between">
         <div className="flex-1 mr-3">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-left"
-            style={{ background: "none", border: "none", cursor: "pointer" }}
-          >
-            <h4
-              className="font-bold uppercase text-xs"
-              style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3" }}
+          <div className="flex items-start justify-between">
+            <Link
+              href={`/thesis/${thesisId}/effect/${effect.id}`}
+              className="font-bold uppercase text-xs hover:underline"
+              style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", textUnderlineOffset: "3px" }}
             >
               {effect.title}
-            </h4>
-          </button>
+            </Link>
+            <div className="flex items-center gap-1 ml-1">
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="text-xs"
+                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+              >
+                {expanded ? "−" : "+"}
+              </button>
+              <button
+                onClick={handleDelete}
+                className="text-xs"
+                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+                title="Delete effect"
+              >
+                x
+              </button>
+            </div>
+          </div>
           <p className="mt-1 text-xs" style={{ color: "var(--text-muted)", lineHeight: "1.4" }}>
             {effect.description}
           </p>
@@ -357,39 +405,23 @@ function EffectCard({ effect }: { effect: Effect }) {
         <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
           {effect.equityBets.length > 0 && (
             <div className="mb-3">
-              <span
-                className="text-xs uppercase block mb-2"
-                style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}
-              >
+              <span className="text-xs uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}>
                 EQUITY BETS
               </span>
               {effect.equityBets.map((bet) => (
                 <div key={bet.id} className="flex items-center gap-3 mb-1">
-                  <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>
-                    {bet.ticker}
-                  </span>
-                  <span
-                    className="text-xs uppercase"
-                    style={{
-                      color:
-                        bet.role === "BENEFICIARY" ? "var(--positive)" : bet.role === "HEADWIND" ? "var(--text-muted)" : "var(--accent)",
-                      fontSize: "9px",
-                      letterSpacing: "0.08em",
-                    }}
-                  >
-                    {bet.role}
-                  </span>
+                  <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>{bet.ticker}</span>
+                  <span className="text-xs uppercase" style={{
+                    color: bet.role === "BENEFICIARY" ? "var(--positive)" : bet.role === "HEADWIND" ? "var(--text-muted)" : "var(--accent)",
+                    fontSize: "9px", letterSpacing: "0.08em",
+                  }}>{bet.role}</span>
                 </div>
               ))}
             </div>
           )}
-
           {effect.startupOpportunities.length > 0 && (
             <div>
-              <span
-                className="text-xs uppercase block mb-2"
-                style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}
-              >
+              <span className="text-xs uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}>
                 OPPORTUNITIES
               </span>
               {effect.startupOpportunities.map((opp) => (
@@ -401,6 +433,77 @@ function EffectCard({ effect }: { effect: Effect }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function AddEffectButton({ thesisId, onCreated }: { thesisId: string; onCreated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+
+  const handleSubmit = async () => {
+    if (!title || !description) return;
+    await api.createEffect(thesisId, { title, description, order: 2 });
+    setTitle("");
+    setDescription("");
+    setOpen(false);
+    onCreated();
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs uppercase"
+        style={{
+          color: "var(--text-muted)",
+          letterSpacing: "0.08em",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          textDecoration: "underline",
+          textUnderlineOffset: "3px",
+        }}
+      >
+        + ADD 2ND ORDER EFFECT
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Effect title"
+        className="text-xs px-2 py-1 border"
+        style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)", outline: "none" }}
+      />
+      <input
+        type="text"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Description"
+        className="text-xs px-2 py-1 border flex-1"
+        style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)", outline: "none" }}
+        onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+      />
+      <button
+        onClick={handleSubmit}
+        className="text-xs uppercase px-2 py-1 border"
+        style={{ color: "var(--text)", borderColor: "var(--text)", background: "none", cursor: "pointer", letterSpacing: "0.08em" }}
+      >
+        ADD
+      </button>
+      <button
+        onClick={() => setOpen(false)}
+        className="text-xs"
+        style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+      >
+        x
+      </button>
     </div>
   );
 }
