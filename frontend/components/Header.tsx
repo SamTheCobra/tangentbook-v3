@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
 import { api, MacroHeader } from "@/lib/api";
 
-export default function Header() {
+interface HeaderProps {
+  onNewThesis?: () => void;
+}
+
+export default function Header({ onNewThesis }: HeaderProps) {
   const [macro, setMacro] = useState<MacroHeader | null>(null);
 
   useEffect(() => {
@@ -20,16 +25,18 @@ export default function Header() {
       }}
     >
       <div className="flex items-center gap-8">
-        <span
+        <Link
+          href="/"
           className="font-bold text-lg uppercase"
           style={{
             color: "var(--text)",
             letterSpacing: "-0.04em",
             fontFamily: "Inter, system-ui, sans-serif",
+            textDecoration: "none",
           }}
         >
           TANGENTBOOK
-        </span>
+        </Link>
 
         {macro && (
           <div className="flex items-center gap-6">
@@ -39,7 +46,7 @@ export default function Header() {
               value={macro.ffr != null ? `${macro.ffr.toFixed(2)}%` : "——"}
             />
             <MacroItem
-              label="10Y–2Y"
+              label="10Y-2Y"
               value={
                 macro.tenYearTwoYearSpread != null
                   ? `${macro.tenYearTwoYearSpread.toFixed(2)}`
@@ -56,6 +63,22 @@ export default function Header() {
 
       <div className="flex items-center gap-6">
         <ThemeToggle />
+        {onNewThesis && (
+          <button
+            onClick={onNewThesis}
+            className="text-xs uppercase px-3 py-1.5 border"
+            style={{
+              color: "var(--text)",
+              borderColor: "var(--text)",
+              letterSpacing: "0.08em",
+              background: "none",
+              cursor: "pointer",
+              fontFamily: "Inter, system-ui, sans-serif",
+            }}
+          >
+            + NEW THESIS
+          </button>
+        )}
       </div>
     </header>
   );

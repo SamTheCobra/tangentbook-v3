@@ -31,7 +31,7 @@ export const api = {
       body: JSON.stringify({ display_order: displayOrder }),
     }),
   updateConviction: (id: string, score: number, note?: string) =>
-    request(`/theses/${id}/conviction`, {
+    request<Thesis>(`/theses/${id}/conviction`, {
       method: "PUT",
       body: JSON.stringify({ score, note }),
     }),
