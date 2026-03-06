@@ -82,24 +82,20 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     const pivotR = size === "lg" ? 5 : size === "md" ? 4 : 3;
     const tipR = size === "lg" ? 4 : size === "md" ? 3 : 2.5;
 
-    // WEDGE — reveals a fixed stationary gradient
+    // WEDGE — stationary gradient, wedge reveals it
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, radius - 4, Math.PI, needleAngle, false);
     ctx.closePath();
-    const gx0 = cx - radius;
-    const gx1 = cx + radius;
-    const grad = ctx.createLinearGradient(gx0, 0, gx1, 0);
-    grad.addColorStop(0,    "rgba(232,68,10,0)");
-    grad.addColorStop(0.08, "rgba(232,68,10,0.01)");
-    grad.addColorStop(0.16, "rgba(232,68,10,0.03)");
-    grad.addColorStop(0.24, "rgba(232,68,10,0.06)");
-    grad.addColorStop(0.32, "rgba(232,68,10,0.12)");
-    grad.addColorStop(0.38, "rgba(232,68,10,0.20)");
-    grad.addColorStop(0.44, "rgba(232,68,10,0.32)");
-    grad.addColorStop(0.50, "rgba(232,68,10,0.65)");
-    grad.addColorStop(1,    "rgba(232,68,10,0.65)");
+    const grad = ctx.createLinearGradient(cx - radius, 0, cx + radius, 0);
+    const maxOpacity = 0.65;
+    const fullAt = 0.72;
+    for (let i = 0; i <= 100; i++) {
+      const t = i / 100;
+      const eased = t < fullAt ? Math.pow(t / fullAt, 3) * maxOpacity : maxOpacity;
+      grad.addColorStop(t, `rgba(232,68,10,${eased.toFixed(4)})`);
+    }
     ctx.fillStyle = grad;
     ctx.fill();
     ctx.restore();
