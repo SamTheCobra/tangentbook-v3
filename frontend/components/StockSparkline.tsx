@@ -1,55 +1,83 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface StockSparklineProps {
   ticker: string;
-  role: string;
 }
 
-export default function StockSparkline({ ticker, role }: StockSparklineProps) {
-  const [tooltip, setTooltip] = useState<string[] | null>(null);
+interface StockData {
+  prices: number[];
+  dates: string[];
+  pctChanges: string[];
+}
 
-  const seed = ticker.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const rand = (i: number) => ((seed * (i + 1) * 2654435761) >>> 0) / 4294967295;
+export default function StockSparkline({ ticker }: StockSparklineProps) {
+  const [data, setData] = useState<StockData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tooltip, setTooltip] = useState(false);
 
-  const points = Array.from({ length: 12 }, (_, i) => {
-    const noise = (rand(i) - 0.5) * 20;
-    const trend =
-      role === "BENEFICIARY" ? i * 2 :
-      role === "HEADWIND" ? i * -2 :
-      Math.sin(i) * 4;
-    return 40 + trend + noise;
-  });
+  useEffect(() => {
+    fetch(`/api/stock/${ticker}`)
+      .then((r) => r.json())
+      .then((d: StockData) => {
+        if (d.prices.length >= 2) {
+          setData(d);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [ticker]);
 
-  const min = Math.min(...points);
-  const max = Math.max(...points);
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div style={{ width: "100%", height: 36, background: "var(--surface-alt)" }} />
+    );
+  }
+
+  // Fallback: flat grey line if no data
+  if (!data || data.prices.length < 2) {
+    return (
+      <div style={{ width: "100%", height: 36, overflow: "hidden" }}>
+        <svg viewBox="0 0 200 36" preserveAspectRatio="none" style={{ width: "100%", height: 36, display: "block" }}>
+          <line x1="0" y1="18" x2="200" y2="18" stroke="#5A5A5A" strokeWidth={1} />
+        </svg>
+      </div>
+    );
+  }
+
+  const { prices, dates, pctChanges } = data;
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
   const range = max - min || 1;
   const normalize = (v: number) => ((v - min) / range) * 30 + 3;
 
-  const pathD = points
+  const pathD = prices
     .map((p, i) => {
-      const x = (i / (points.length - 1)) * 200;
+      const x = (i / (prices.length - 1)) * 200;
       const y = 36 - normalize(p);
       return `${i === 0 ? "M" : "L"}${x},${y}`;
     })
     .join(" ");
 
-  const pctChanges = points
-    .slice(-5)
-    .map((p, i, arr) =>
-      i === 0 ? null : ((p - arr[i - 1]) / arr[i - 1] * 100).toFixed(1)
-    )
-    .filter((v): v is string => v !== null);
-
-  const isUp = points[points.length - 1] > points[0];
+  const isUp = prices[prices.length - 1] > prices[0];
   const color = isUp ? "#FF4500" : "#5A5A5A";
+
+  // Last 5 months for tooltip
+  const tooltipEntries = pctChanges.slice(-5).map((pct, i) => {
+    const dateIdx = dates.length - 5 + i;
+    return {
+      date: dates[dateIdx] || "",
+      pct,
+    };
+  });
 
   return (
     <div
       style={{ width: "100%", height: 36, overflow: "hidden", position: "relative" }}
-      onMouseEnter={() => setTooltip(pctChanges)}
-      onMouseLeave={() => setTooltip(null)}
+      onMouseEnter={() => setTooltip(true)}
+      onMouseLeave={() => setTooltip(false)}
     >
       <svg
         viewBox="0 0 200 36"
@@ -65,7 +93,7 @@ export default function StockSparkline({ ticker, role }: StockSparklineProps) {
           strokeLinejoin="round"
         />
       </svg>
-      {tooltip && (
+      {tooltip && tooltipEntries.length > 0 && (
         <div
           style={{
             position: "absolute",
@@ -82,13 +110,17 @@ export default function StockSparkline({ ticker, role }: StockSparklineProps) {
             pointerEvents: "none",
           }}
         >
-          {tooltip.map((v, i) => (
+          {tooltipEntries.map((entry, i) => (
             <div
               key={i}
-              style={{ color: parseFloat(v) >= 0 ? "#FF4500" : "#5A5A5A" }}
+              className="flex justify-between gap-4"
+              style={{ color: parseFloat(entry.pct) >= 0 ? "#FF4500" : "#5A5A5A" }}
             >
-              {parseFloat(v) >= 0 ? "+" : ""}
-              {v}%
+              <span>{entry.date}</span>
+              <span>
+                {parseFloat(entry.pct) >= 0 ? "+" : ""}
+                {entry.pct}%
+              </span>
             </div>
           ))}
         </div>

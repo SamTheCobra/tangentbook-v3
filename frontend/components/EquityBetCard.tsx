@@ -51,7 +51,7 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
 
       {/* Sparkline row: full card width */}
       <div className="px-5">
-        <StockSparkline ticker={bet.ticker} role={bet.role} />
+        <StockSparkline ticker={bet.ticker} />
       </div>
 
       {/* Body */}
