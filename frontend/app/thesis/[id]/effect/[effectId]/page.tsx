@@ -10,7 +10,7 @@ import StartupCard from "@/components/StartupCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ConvictionSlider from "@/components/ConvictionSlider";
 import TrashIcon from "@/components/TrashIcon";
-import { api, ThesisDetail, Effect } from "@/lib/api";
+import { api, ThesisDetail, Effect, ScoringBreakdown, EvidenceDimension } from "@/lib/api";
 
 export default function EffectDetailPage() {
   const params = useParams();
@@ -18,24 +18,29 @@ export default function EffectDetailPage() {
   const effectId = params.effectId as string;
   const [thesis, setThesis] = useState<ThesisDetail | null>(null);
   const [effect, setEffect] = useState<Effect | null>(null);
+  const [breakdown, setBreakdown] = useState<ScoringBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
+  const [scoringOpen, setScoringOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"bets" | "startups">("bets");
 
   const reloadEffect = async () => {
-    const [t, e] = await Promise.all([
+    const [t, e, b] = await Promise.all([
       api.getThesis(thesisId),
       api.getEffect(effectId),
+      api.getScoringBreakdown(thesisId),
     ]);
     setThesis(t);
     setEffect(e);
+    setBreakdown(b);
   };
 
   useEffect(() => {
     if (!thesisId || !effectId) return;
-    Promise.all([api.getThesis(thesisId), api.getEffect(effectId)])
-      .then(([t, e]) => {
+    Promise.all([api.getThesis(thesisId), api.getEffect(effectId), api.getScoringBreakdown(thesisId)])
+      .then(([t, e, b]) => {
         setThesis(t);
         setEffect(e);
+        setBreakdown(b);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -158,6 +163,37 @@ export default function EffectDetailPage() {
           </div>
         </div>
 
+        {/* Collapsible scoring breakdown trigger */}
+        <div className="flex items-center gap-4 mb-6">
+          <button
+            onClick={() => setScoringOpen(!scoringOpen)}
+            className="uppercase flex items-center gap-2"
+            style={{
+              color: "var(--text-muted)",
+              letterSpacing: "0.08em",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "13px",
+            }}
+          >
+            HOW IS THIS SCORED?{" "}
+            <span style={{ fontSize: "12px" }}>
+              {scoringOpen ? "▲" : "▾"}
+            </span>
+          </button>
+        </div>
+
+        {scoringOpen && breakdown && (
+          <div className="mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-4">
+              <EvidenceColumn breakdown={breakdown} />
+              <MomentumColumn breakdown={breakdown} />
+              <DataQualityColumn breakdown={breakdown} />
+            </div>
+          </div>
+        )}
+
         <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
 
         {/* ══════════════════════════════════════════════════
@@ -191,7 +227,6 @@ export default function EffectDetailPage() {
                 ))}
               </div>
             )}
-            <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
           </>
         )}
 
@@ -248,7 +283,6 @@ function TabButton({ label, active, onClick }: { label: string; active: boolean;
 function ChildEffectThumbnail({
   child,
   thesisId,
-  parentEffectId,
   onDeleted,
 }: {
   child: Effect;
@@ -337,5 +371,314 @@ function ChildEffectThumbnail({
         </div>
       )}
     </Link>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCORING BREAKDOWN COLUMNS (inherited from parent thesis)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function EvidenceColumn({ breakdown }: { breakdown: ScoringBreakdown }) {
+  const ev = breakdown.evidence;
+  const dims = [
+    { key: "flow", label: "FLOW", data: ev.flow },
+    { key: "structural", label: "STRUCTURAL", data: ev.structural },
+    { key: "adoption", label: "ADOPTION", data: ev.adoption },
+    { key: "policy", label: "POLICY", data: ev.policy },
+  ];
+
+  return (
+    <div
+      className="border p-5"
+      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="uppercase font-bold"
+            style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}
+          >
+            EVIDENCE
+          </span>
+          <span
+            className="uppercase"
+            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
+          >
+            50%
+          </span>
+        </div>
+        <span
+          style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "20px", fontWeight: "bold" }}
+        >
+          {Math.round(ev.score)}
+        </span>
+      </div>
+      <div className="flex justify-center mb-4">
+        <Needle score={ev.score} size="sm" label="" animated={true} />
+      </div>
+      <div className="flex flex-col gap-4">
+        {dims.map(({ key, label, data }) => (
+          <DimensionBlock key={key} label={label} dim={data} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DimensionBlock({ label, dim }: { label: string; dim: EvidenceDimension }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span
+          className="uppercase"
+          style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "11px" }}
+        >
+          {label}{" "}
+          <span style={{ color: "var(--text-muted)" }}>
+            {(dim.weight * 100).toFixed(0)}%
+          </span>
+        </span>
+        <span
+          style={{
+            color: dim.score != null ? "var(--accent)" : "var(--text-muted)",
+            fontFamily: "JetBrains Mono, monospace",
+            fontSize: "13px",
+          }}
+        >
+          {dim.score != null ? Math.round(dim.score) : "—"}
+        </span>
+      </div>
+      <p style={{ color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4", marginBottom: "4px" }}>
+        {dim.description}
+      </p>
+      {dim.feeds.length > 0 ? (
+        <div style={{ fontSize: "11px" }}>
+          {dim.feeds.map((f) => (
+            <div
+              key={f.name}
+              className="mb-2 pb-2"
+              style={{ borderBottom: "1px solid var(--border)" }}
+            >
+              <div className="flex items-center justify-between" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                <span style={{ color: "var(--text-muted)" }}>
+                  {f.name}{" "}
+                  <span
+                    style={{
+                      color: f.status === "live" ? "var(--status-live)" : "var(--status-stale)",
+                      fontSize: "9px",
+                    }}
+                  >
+                    ●
+                  </span>
+                </span>
+                <span style={{ color: f.normalizedScore != null ? "var(--accent)" : "var(--text-muted)" }}>
+                  {f.normalizedScore != null ? f.normalizedScore : "—"}
+                </span>
+              </div>
+              {f.formattedValue && (
+                <div style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--text)", fontSize: "12px", marginTop: "2px" }}>
+                  {f.formattedValue}
+                  {f.seriesId && <span style={{ color: "var(--text-muted)", marginLeft: "6px" }}>{f.seriesId}</span>}
+                  {f.keyword && <span style={{ color: "var(--text-muted)", marginLeft: "6px" }}>&quot;{f.keyword}&quot;</span>}
+                </div>
+              )}
+              <div style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", fontSize: "10px", marginTop: "2px" }}>
+                {f.pctVs1yr != null && (
+                  <span style={{ color: f.pctVs1yr >= 0 ? "#FF4500" : "var(--text-muted)" }}>
+                    vs 1yr: {f.pctVs1yr >= 0 ? "+" : ""}{f.pctVs1yr}%
+                  </span>
+                )}
+                {f.pctVs1yr != null && f.pctVs5yrAvg != null && <span> · </span>}
+                {f.pctVs5yrAvg != null && (
+                  <span style={{ color: f.pctVs5yrAvg >= 0 ? "#FF4500" : "var(--text-muted)" }}>
+                    vs 5yr avg: {f.pctVs5yrAvg >= 0 ? "+" : ""}{f.pctVs5yrAvg}%
+                  </span>
+                )}
+              </div>
+              {f.context && (
+                <div style={{ color: "var(--text-muted)", fontSize: "10px", lineHeight: "1.4", marginTop: "2px" }}>
+                  {f.context}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <span style={{ color: "var(--text-muted)", fontSize: "11px", fontStyle: "italic" }}>
+          No {label.toLowerCase()} feeds configured
+        </span>
+      )}
+      {dim.lastUpdated && (
+        <div style={{ color: "#242424", fontSize: "10px", fontFamily: "JetBrains Mono, monospace", marginTop: "2px" }}>
+          Updated {new Date(dim.lastUpdated).toLocaleDateString()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MomentumColumn({ breakdown }: { breakdown: ScoringBreakdown }) {
+  const m = breakdown.momentum;
+  const entries = [
+    { label: "30D MOMENTUM", weight: "50%", desc: "How much has the evidence score changed in the last 30 days? Positive = thesis accelerating.", data: m.thirtyDay },
+    { label: "90D MOMENTUM", weight: "35%", desc: "Medium-term direction — smooths out noise from the 30-day view.", data: m.ninetyDay },
+    { label: "1YR MOMENTUM", weight: "15%", desc: "Long-term structural direction — is this thesis gaining or losing ground over a full year?", data: m.oneYear },
+  ];
+
+  return (
+    <div
+      className="border p-5"
+      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="uppercase font-bold"
+            style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}
+          >
+            MOMENTUM
+          </span>
+          <span
+            className="uppercase"
+            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
+          >
+            30%
+          </span>
+        </div>
+        <span
+          style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "20px", fontWeight: "bold" }}
+        >
+          {Math.round(m.score)}
+        </span>
+      </div>
+      <div className="flex justify-center mb-4">
+        <Needle score={m.score} size="sm" label="" animated={true} />
+      </div>
+      <div className="flex flex-col gap-4">
+        {entries.map((e) => (
+          <div key={e.label}>
+            <div className="flex items-center justify-between mb-1">
+              <span
+                className="uppercase"
+                style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "11px" }}
+              >
+                {e.label}{" "}
+                <span style={{ color: "var(--text-muted)" }}>{e.weight}</span>
+              </span>
+              <span
+                style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}
+              >
+                {Math.round(e.data.score)}
+              </span>
+            </div>
+            <p style={{ color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4", marginBottom: "4px" }}>
+              {e.desc}
+            </p>
+            <div
+              style={{
+                fontFamily: "JetBrains Mono, monospace",
+                fontSize: "12px",
+                color: e.data.delta != null && e.data.delta >= 0 ? "#FF4500" : "var(--text-muted)",
+              }}
+            >
+              {e.data.delta != null
+                ? `${e.data.delta >= 0 ? "+" : ""}${e.data.delta} points`
+                : "— insufficient history"}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DataQualityColumn({ breakdown }: { breakdown: ScoringBreakdown }) {
+  const dq = breakdown.dataQuality;
+
+  return (
+    <div
+      className="border p-5"
+      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="uppercase font-bold"
+            style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}
+          >
+            DATA QUALITY
+          </span>
+          <span
+            className="uppercase"
+            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
+          >
+            20%
+          </span>
+        </div>
+        <span
+          style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "20px", fontWeight: "bold" }}
+        >
+          {Math.round(dq.score)}
+        </span>
+      </div>
+      <div className="flex justify-center mb-4">
+        <Needle score={dq.score} size="sm" label="" animated={true} />
+      </div>
+      <div className="flex flex-col gap-4">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="uppercase" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "11px" }}>
+              AGREEMENT <span style={{ color: "var(--text-muted)" }}>50%</span>
+            </span>
+            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+              {Math.round(dq.agreement.score)}
+            </span>
+          </div>
+          <p style={{ color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4", marginBottom: "4px" }}>
+            Do the feeds agree with each other? If some say &quot;confirming&quot; but others say &quot;refuting&quot;, confidence is low.
+          </p>
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text-muted)" }}>
+            {dq.agreement.pctConfirming != null
+              ? `${dq.agreement.pctConfirming}% of feeds pointing confirming`
+              : "— no scored feeds"}
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="uppercase" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "11px" }}>
+              FRESHNESS <span style={{ color: "var(--text-muted)" }}>30%</span>
+            </span>
+            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+              {Math.round(dq.freshness.score)}
+            </span>
+          </div>
+          <p style={{ color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4", marginBottom: "4px" }}>
+            How recent is the data? Stale data = less reliable score.
+          </p>
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text-muted)" }}>
+            {dq.freshness.avgAgeDays != null
+              ? `Avg age: ${dq.freshness.avgAgeDays}d`
+              : "— no data"}{" "}
+            · {dq.freshness.live} live / {dq.freshness.stale} stale / {dq.freshness.degraded} degraded
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="uppercase" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "11px" }}>
+              SOURCE QUALITY <span style={{ color: "var(--text-muted)" }}>20%</span>
+            </span>
+            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+              {Math.round(dq.sourceQuality.score)}
+            </span>
+          </div>
+          <p style={{ color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4", marginBottom: "4px" }}>
+            Are these feeds from authoritative sources? FRED/BLS = 100. Google Trends = 65. Estimated = 20.
+          </p>
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text-muted)" }}>
+            Weighted avg: {dq.sourceQuality.weightedAvg}/100
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

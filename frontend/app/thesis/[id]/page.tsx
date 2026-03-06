@@ -16,6 +16,7 @@ import {
   Effect,
   ScoringBreakdown,
   EvidenceDimension,
+  Portfolio,
 } from "@/lib/api";
 
 export default function ThesisDetailPage() {
@@ -27,14 +28,18 @@ export default function ThesisDetailPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [scoringOpen, setScoringOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"bets" | "startups">("bets");
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [portfolioOpen, setPortfolioOpen] = useState(false);
 
   const reloadThesis = async () => {
-    const [t, b] = await Promise.all([
+    const [t, b, p] = await Promise.all([
       api.getThesis(id),
       api.getScoringBreakdown(id),
+      api.getPortfolio(id).catch(() => null),
     ]);
     setThesis(t);
     setBreakdown(b);
+    if (p) setPortfolio(p);
   };
 
   useEffect(() => {
@@ -42,10 +47,12 @@ export default function ThesisDetailPage() {
     Promise.all([
       api.getThesis(id),
       api.getScoringBreakdown(id),
+      api.getPortfolio(id).catch(() => null),
     ])
-      .then(([t, b]) => {
+      .then(([t, b, p]) => {
         setThesis(t);
         setBreakdown(b);
+        if (p) setPortfolio(p);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -279,6 +286,17 @@ export default function ThesisDetailPage() {
             </div>
           )}
 
+          {/* ══════════════════════════════════════════════════
+              SECTION 2.5: PORTFOLIO TRACKER
+              ══════════════════════════════════════════════════ */}
+          <PortfolioTracker
+            thesisId={thesis.id}
+            portfolio={portfolio}
+            isOpen={portfolioOpen}
+            onToggle={() => setPortfolioOpen(!portfolioOpen)}
+            onReload={reloadThesis}
+          />
+
           <div
             className="mb-8"
             style={{ borderTop: "1px solid var(--border)" }}
@@ -317,10 +335,6 @@ export default function ThesisDetailPage() {
                     ))}
                   </div>
                 )}
-              <div
-                className="mb-8"
-                style={{ borderTop: "1px solid var(--border)" }}
-              />
             </>
           )}
 
@@ -329,10 +343,6 @@ export default function ThesisDetailPage() {
               ══════════════════════════════════════════════════ */}
           {thesis.effects.length > 0 && (
             <>
-              <div
-                className="mb-8"
-                style={{ borderTop: "1px solid var(--border)" }}
-              />
               <div className="flex items-center justify-between mb-4">
                 <h3
                   className="uppercase"
@@ -473,35 +483,54 @@ function DimensionBlock({
         {dim.description}
       </p>
       {dim.feeds.length > 0 ? (
-        <div
-          style={{
-            fontFamily: "JetBrains Mono, monospace",
-            fontSize: "11px",
-          }}
-        >
+        <div style={{ fontSize: "11px" }}>
           {dim.feeds.map((f) => (
             <div
               key={f.name}
-              className="flex items-center justify-between"
-              style={{ color: "var(--text-muted)", lineHeight: "1.6" }}
+              className="mb-2 pb-2"
+              style={{ borderBottom: "1px solid var(--border)" }}
             >
-              <span>
-                {f.name}{" "}
-                <span
-                  style={{
-                    color:
-                      f.status === "live"
-                        ? "var(--status-live)"
-                        : "var(--status-stale)",
-                    fontSize: "9px",
-                  }}
-                >
-                  ●
+              <div className="flex items-center justify-between" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                <span style={{ color: "var(--text-muted)" }}>
+                  {f.name}{" "}
+                  <span
+                    style={{
+                      color: f.status === "live" ? "var(--status-live)" : "var(--status-stale)",
+                      fontSize: "9px",
+                    }}
+                  >
+                    ●
+                  </span>
                 </span>
-              </span>
-              <span style={{ color: f.normalizedScore != null ? "var(--accent)" : "var(--text-muted)" }}>
-                {f.normalizedScore != null ? f.normalizedScore : "—"}
-              </span>
+                <span style={{ color: f.normalizedScore != null ? "var(--accent)" : "var(--text-muted)" }}>
+                  {f.normalizedScore != null ? f.normalizedScore : "—"}
+                </span>
+              </div>
+              {f.formattedValue && (
+                <div style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--text)", fontSize: "12px", marginTop: "2px" }}>
+                  {f.formattedValue}
+                  {f.seriesId && <span style={{ color: "var(--text-muted)", marginLeft: "6px" }}>{f.seriesId}</span>}
+                  {f.keyword && <span style={{ color: "var(--text-muted)", marginLeft: "6px" }}>&quot;{f.keyword}&quot;</span>}
+                </div>
+              )}
+              <div style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", fontSize: "10px", marginTop: "2px" }}>
+                {f.pctVs1yr != null && (
+                  <span style={{ color: f.pctVs1yr >= 0 ? "#FF4500" : "var(--text-muted)" }}>
+                    vs 1yr: {f.pctVs1yr >= 0 ? "+" : ""}{f.pctVs1yr}%
+                  </span>
+                )}
+                {f.pctVs1yr != null && f.pctVs5yrAvg != null && <span> · </span>}
+                {f.pctVs5yrAvg != null && (
+                  <span style={{ color: f.pctVs5yrAvg >= 0 ? "#FF4500" : "var(--text-muted)" }}>
+                    vs 5yr avg: {f.pctVs5yrAvg >= 0 ? "+" : ""}{f.pctVs5yrAvg}%
+                  </span>
+                )}
+              </div>
+              {f.context && (
+                <div style={{ color: "var(--text-muted)", fontSize: "10px", lineHeight: "1.4", marginTop: "2px" }}>
+                  {f.context}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1096,6 +1125,311 @@ function AddEffectButton({
       >
         <TrashIcon size={14} />
       </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PORTFOLIO TRACKER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const INTERPRETATION_LABELS: Record<string, { label: string; color: string; desc: string }> = {
+  ALIGNED_WINNING: { label: "ALIGNED & WINNING", color: "#22C55E", desc: "THI is strong and your portfolio is performing — thesis is validated by both data and market." },
+  THESIS_STRONG_PORTFOLIO_WEAK: { label: "THESIS STRONG, PORTFOLIO WEAK", color: "#FF4500", desc: "Data supports this thesis but your positions haven't moved yet — potential buying opportunity or wrong picks." },
+  THESIS_WEAK_PORTFOLIO_STRONG: { label: "THESIS WEAK, PORTFOLIO STRONG", color: "#F59E0B", desc: "Your positions are up but the underlying thesis is weakening — consider taking profits." },
+  ALIGNED_LOSING: { label: "ALIGNED & LOSING", color: "#EF4444", desc: "Both THI and portfolio are down — thesis may be wrong or too early." },
+  NEUTRAL: { label: "NEUTRAL", color: "var(--text-muted)", desc: "No strong signal in either direction." },
+};
+
+function PortfolioTracker({
+  thesisId,
+  portfolio,
+  isOpen,
+  onToggle,
+  onReload,
+}: {
+  thesisId: string;
+  portfolio: Portfolio | null;
+  isOpen: boolean;
+  onToggle: () => void;
+  onReload: () => void;
+}) {
+  const [addingPosition, setAddingPosition] = useState(false);
+  const [ticker, setTicker] = useState("");
+  const [shares, setShares] = useState("");
+  const [entryPrice, setEntryPrice] = useState("");
+  const [isShort, setIsShort] = useState(false);
+
+  const hasPositions = portfolio && portfolio.positions.length > 0;
+
+  const handleAddPosition = async () => {
+    if (!ticker || !shares || !entryPrice) return;
+    await api.addPosition(thesisId, {
+      ticker: ticker.toUpperCase(),
+      shares: parseFloat(shares),
+      entry_price: parseFloat(entryPrice),
+      is_short: isShort,
+    });
+    setTicker("");
+    setShares("");
+    setEntryPrice("");
+    setIsShort(false);
+    setAddingPosition(false);
+    onReload();
+  };
+
+  const handleDeletePosition = async (positionId: string) => {
+    if (!confirm("Remove this position?")) return;
+    await api.deletePosition(positionId);
+    onReload();
+  };
+
+  const interp = portfolio ? INTERPRETATION_LABELS[portfolio.interpretation] || INTERPRETATION_LABELS.NEUTRAL : INTERPRETATION_LABELS.NEUTRAL;
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-center gap-4 mb-4">
+        <button
+          onClick={onToggle}
+          className="uppercase flex items-center gap-2"
+          style={{
+            color: hasPositions ? "var(--accent)" : "var(--text-muted)",
+            letterSpacing: "0.08em",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: "13px",
+          }}
+        >
+          {hasPositions ? "PORTFOLIO TRACKER" : "TRACK THIS THESIS"}{" "}
+          <span style={{ fontSize: "12px" }}>{isOpen ? "▲" : "▾"}</span>
+        </button>
+        {hasPositions && portfolio && (
+          <span
+            style={{
+              fontFamily: "JetBrains Mono, monospace",
+              fontSize: "13px",
+              color: portfolio.totalPnl >= 0 ? "#22C55E" : "#EF4444",
+            }}
+          >
+            {portfolio.totalPnl >= 0 ? "+" : ""}{portfolio.totalPnlPct.toFixed(1)}% (${portfolio.totalPnl.toFixed(0)})
+          </span>
+        )}
+      </div>
+
+      {isOpen && (
+        <div
+          className="border p-5 mb-4"
+          style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+        >
+          {/* Interpretation banner */}
+          {hasPositions && (
+            <div className="mb-4 pb-3" style={{ borderBottom: "1px solid var(--border)" }}>
+              <div className="flex items-center gap-3 mb-1">
+                <span
+                  className="uppercase font-bold"
+                  style={{ color: interp.color, letterSpacing: "0.08em", fontSize: "12px" }}
+                >
+                  {interp.label}
+                </span>
+                <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text-muted)" }}>
+                  THI {Math.round(portfolio!.thiScore)} · P&L {portfolio!.totalPnlPct >= 0 ? "+" : ""}{portfolio!.totalPnlPct.toFixed(1)}%
+                </span>
+              </div>
+              <p style={{ color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4" }}>
+                {interp.desc}
+              </p>
+            </div>
+          )}
+
+          {/* Position list */}
+          {hasPositions && (
+            <div className="mb-4">
+              <div
+                className="grid mb-2 uppercase"
+                style={{
+                  gridTemplateColumns: "80px 1fr 80px 80px 80px 30px",
+                  gap: "8px",
+                  color: "var(--text-muted)",
+                  letterSpacing: "0.08em",
+                  fontSize: "10px",
+                }}
+              >
+                <span>TICKER</span>
+                <span>SHARES × ENTRY</span>
+                <span>CURRENT</span>
+                <span>P&L</span>
+                <span>P&L %</span>
+                <span />
+              </div>
+              {portfolio!.positions.map((p) => (
+                <div
+                  key={p.id}
+                  className="grid items-center"
+                  style={{
+                    gridTemplateColumns: "80px 1fr 80px 80px 80px 30px",
+                    gap: "8px",
+                    fontFamily: "JetBrains Mono, monospace",
+                    fontSize: "12px",
+                    lineHeight: "2",
+                    borderBottom: "1px solid var(--border)",
+                  }}
+                >
+                  <span style={{ color: p.isShort ? "#EF4444" : "var(--accent)" }}>
+                    {p.isShort ? "▼" : ""}{p.ticker}
+                  </span>
+                  <span style={{ color: "var(--text-muted)" }}>
+                    {p.shares} × ${p.entryPrice.toFixed(2)}
+                  </span>
+                  <span style={{ color: "var(--text)" }}>
+                    ${(p.currentPrice || p.entryPrice).toFixed(2)}
+                  </span>
+                  <span style={{ color: (p.pnl || 0) >= 0 ? "#22C55E" : "#EF4444" }}>
+                    {(p.pnl || 0) >= 0 ? "+" : ""}${(p.pnl || 0).toFixed(0)}
+                  </span>
+                  <span style={{ color: (p.pnlPct || 0) >= 0 ? "#22C55E" : "#EF4444" }}>
+                    {(p.pnlPct || 0) >= 0 ? "+" : ""}{(p.pnlPct || 0).toFixed(1)}%
+                  </span>
+                  <button
+                    onClick={() => handleDeletePosition(p.id)}
+                    style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+                  >
+                    <TrashIcon size={12} />
+                  </button>
+                </div>
+              ))}
+              <div
+                className="grid mt-2 font-bold"
+                style={{
+                  gridTemplateColumns: "80px 1fr 80px 80px 80px 30px",
+                  gap: "8px",
+                  fontFamily: "JetBrains Mono, monospace",
+                  fontSize: "12px",
+                }}
+              >
+                <span style={{ color: "var(--text)" }}>TOTAL</span>
+                <span style={{ color: "var(--text-muted)" }}>
+                  Cost: ${portfolio!.totalCost.toFixed(0)}
+                </span>
+                <span style={{ color: "var(--text)" }}>
+                  ${portfolio!.totalValue.toFixed(0)}
+                </span>
+                <span style={{ color: portfolio!.totalPnl >= 0 ? "#22C55E" : "#EF4444" }}>
+                  {portfolio!.totalPnl >= 0 ? "+" : ""}${portfolio!.totalPnl.toFixed(0)}
+                </span>
+                <span style={{ color: portfolio!.totalPnlPct >= 0 ? "#22C55E" : "#EF4444" }}>
+                  {portfolio!.totalPnlPct >= 0 ? "+" : ""}{portfolio!.totalPnlPct.toFixed(1)}%
+                </span>
+                <span />
+              </div>
+            </div>
+          )}
+
+          {/* Add position form */}
+          {addingPosition ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                value={ticker}
+                onChange={(e) => setTicker(e.target.value)}
+                placeholder="TICKER"
+                className="px-2 py-1 border"
+                style={{
+                  background: "var(--bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                  outline: "none",
+                  fontSize: "13px",
+                  width: "80px",
+                  fontFamily: "JetBrains Mono, monospace",
+                }}
+              />
+              <input
+                type="number"
+                value={shares}
+                onChange={(e) => setShares(e.target.value)}
+                placeholder="Shares"
+                className="px-2 py-1 border"
+                style={{
+                  background: "var(--bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                  outline: "none",
+                  fontSize: "13px",
+                  width: "80px",
+                  fontFamily: "JetBrains Mono, monospace",
+                }}
+              />
+              <input
+                type="number"
+                value={entryPrice}
+                onChange={(e) => setEntryPrice(e.target.value)}
+                placeholder="Entry $"
+                className="px-2 py-1 border"
+                style={{
+                  background: "var(--bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                  outline: "none",
+                  fontSize: "13px",
+                  width: "90px",
+                  fontFamily: "JetBrains Mono, monospace",
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleAddPosition()}
+              />
+              <label
+                className="flex items-center gap-1 uppercase"
+                style={{ color: "var(--text-muted)", fontSize: "11px", letterSpacing: "0.08em", cursor: "pointer" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isShort}
+                  onChange={(e) => setIsShort(e.target.checked)}
+                  style={{ accentColor: "var(--accent)" }}
+                />
+                SHORT
+              </label>
+              <button
+                onClick={handleAddPosition}
+                className="uppercase px-2 py-1 border"
+                style={{
+                  color: "var(--text)",
+                  borderColor: "var(--text)",
+                  background: "none",
+                  cursor: "pointer",
+                  letterSpacing: "0.08em",
+                  fontSize: "12px",
+                }}
+              >
+                ADD
+              </button>
+              <button
+                onClick={() => setAddingPosition(false)}
+                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+              >
+                <TrashIcon size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddingPosition(true)}
+              className="uppercase"
+              style={{
+                color: "var(--text-muted)",
+                letterSpacing: "0.08em",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                textDecoration: "underline",
+                textUnderlineOffset: "3px",
+                fontSize: "12px",
+              }}
+            >
+              + ADD POSITION
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

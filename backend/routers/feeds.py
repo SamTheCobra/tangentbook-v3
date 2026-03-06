@@ -148,6 +148,90 @@ def scoring_breakdown(thesis_id: str, db: Session = Depends(get_db)):
 
     # ── EVIDENCE BREAKDOWN ────────────────────────────────────────────────
     dimensions: dict[str, dict] = {}
+    # Build a map of feed_id -> historical cache entries for comparisons
+    all_cache = db.query(FeedCache).filter(
+        FeedCache.feed_id.in_([f.id for f in feeds])
+    ).order_by(FeedCache.fetched_at).all()
+    cache_by_feed: dict[str, list] = {}
+    for c in all_cache:
+        cache_by_feed.setdefault(c.feed_id, []).append(c)
+
+    # Unit mapping for known FRED series
+    SERIES_UNITS = {
+        "M2SL": ("$T", 1e-3, "trillion"),
+        "WALCL": ("$T", 1e-3, "trillion"),
+        "BOGMBASE": ("$T", 1e-3, "trillion"),
+        "TCMDO": ("$T", 1e-3, "trillion"),
+        "GFDEBTN": ("$T", 1e-3, "trillion"),
+        "DGS10": ("%", 1, "percent"),
+        "DGS2": ("%", 1, "percent"),
+        "DFEDTARU": ("%", 1, "percent"),
+        "FEDFUNDS": ("%", 1, "percent"),
+        "T10Y2Y": ("bps", 100, "basis points"),
+        "T10YIE": ("%", 1, "percent"),
+        "CPIAUCSL": ("idx", 1, "index"),
+        "CPILFESL": ("idx", 1, "index"),
+        "PCEPI": ("idx", 1, "index"),
+        "PCEPILFE": ("idx", 1, "index"),
+        "UNRATE": ("%", 1, "percent"),
+        "PAYEMS": ("K", 1, "thousand"),
+        "ICSA": ("K", 1, "thousand"),
+        "UMCSENT": ("idx", 1, "index"),
+        "VIXCLS": ("idx", 1, "index"),
+        "DTWEXBGS": ("idx", 1, "index"),
+        "MORTGAGE30US": ("%", 1, "percent"),
+        "HOUST": ("K", 1, "thousand"),
+        "PERMIT": ("K", 1, "thousand"),
+        "INDPRO": ("idx", 1, "index"),
+        "RSAFS": ("$B", 1e-3, "billion"),
+        "RETAILSMNSA": ("$B", 1e-3, "billion"),
+        "TOTALSA": ("M", 1, "million"),
+        "JTSJOL": ("K", 1, "thousand"),
+        "DCOILWTICO": ("$/bbl", 1, "per barrel"),
+        "GASREGW": ("$/gal", 1, "per gallon"),
+        "DEXUSEU": ("$/€", 1, "per euro"),
+        "DEXJPUS": ("¥/$", 1, "yen per dollar"),
+    }
+
+    def format_value(f_obj):
+        """Format raw value with appropriate units."""
+        if f_obj.raw_value is None:
+            return None
+        sid = f_obj.series_id or ""
+        if sid in SERIES_UNITS:
+            unit, scale, _ = SERIES_UNITS[sid]
+            if scale != 1:
+                return f"{f_obj.raw_value * scale:.2f}{unit}"
+            if unit == "%":
+                return f"{f_obj.raw_value:.2f}%"
+            if unit == "bps":
+                return f"{f_obj.raw_value * 100:.0f}bps"
+            return f"{f_obj.raw_value:.2f} {unit}"
+        if f_obj.source == "GTRENDS":
+            return f"{f_obj.raw_value:.0f}/100"
+        return f"{f_obj.raw_value:.2f}"
+
+    def get_context_sentence(f_obj, thesis_obj):
+        """Generate a plain-English context sentence for this feed relative to the thesis."""
+        if f_obj.raw_value is None:
+            return "No data available yet."
+        direction = f_obj.confirming_direction or "higher"
+        score = f_obj.normalized_score
+        if score is None:
+            return "Awaiting normalization."
+        if score >= 70:
+            strength = "strongly confirming"
+        elif score >= 55:
+            strength = "mildly confirming"
+        elif score >= 45:
+            strength = "neutral for"
+        elif score >= 30:
+            strength = "mildly refuting"
+        else:
+            strength = "strongly refuting"
+        dir_explanation = f"({direction} = confirming)" if direction == "higher" else f"({direction} = confirming)"
+        return f"Currently {strength} this thesis. {dir_explanation}"
+
     for dim_key, dim_cfg in EVIDENCE_DIMENSIONS.items():
         dim_feeds = [f for f in feeds if f.source_type == dim_key]
         feed_list = []
@@ -160,12 +244,44 @@ def scoring_breakdown(thesis_id: str, db: Session = Depends(get_db)):
             lu = f.last_fetched
             if lu and (latest_update is None or lu > latest_update):
                 latest_update = lu
+
+            # Historical comparison from cache
+            history = cache_by_feed.get(f.id, [])
+            one_year_ago_val = None
+            five_year_avg = None
+            if history:
+                one_yr_target = now - timedelta(days=365)
+                candidates_1yr = [c for c in history if c.raw_value is not None]
+                if candidates_1yr:
+                    closest_1yr = min(candidates_1yr, key=lambda c: abs((c.fetched_at - one_yr_target).total_seconds()))
+                    if abs((closest_1yr.fetched_at - one_yr_target).total_seconds()) < 90 * 86400:
+                        one_year_ago_val = closest_1yr.raw_value
+                five_yr_target = now - timedelta(days=5*365)
+                five_yr_vals = [c.raw_value for c in candidates_1yr if c.fetched_at >= five_yr_target and c.raw_value is not None] if candidates_1yr else []
+                if five_yr_vals:
+                    five_year_avg = sum(five_yr_vals) / len(five_yr_vals)
+
+            pct_vs_1yr = None
+            if one_year_ago_val and f.raw_value is not None and one_year_ago_val != 0:
+                pct_vs_1yr = round(((f.raw_value - one_year_ago_val) / abs(one_year_ago_val)) * 100, 1)
+            pct_vs_5yr = None
+            if five_year_avg and f.raw_value is not None and five_year_avg != 0:
+                pct_vs_5yr = round(((f.raw_value - five_year_avg) / abs(five_year_avg)) * 100, 1)
+
             feed_list.append({
                 "name": f.name.replace("Fred ", "").replace("Gtrends ", ""),
                 "value": f.raw_value,
+                "formattedValue": format_value(f),
                 "normalizedScore": round(score) if score is not None else None,
                 "status": f.status,
                 "lastUpdated": lu.isoformat() if lu else None,
+                "seriesId": f.series_id,
+                "keyword": f.keyword,
+                "source": f.source,
+                "confirmingDirection": f.confirming_direction,
+                "pctVs1yr": pct_vs_1yr,
+                "pctVs5yrAvg": pct_vs_5yr,
+                "context": get_context_sentence(f, thesis),
             })
         dim_score = round(sum(scores) / len(scores), 1) if scores else None
         dimensions[dim_key] = {

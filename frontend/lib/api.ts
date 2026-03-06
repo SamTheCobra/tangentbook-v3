@@ -84,6 +84,21 @@ export const api = {
     request(`/theses/${thesisId}/feeds/refresh`, { method: "POST" }),
   getFeedHistory: (feedId: string) => request(`/feeds/${feedId}/history`),
 
+  // Portfolio
+  getPortfolio: (thesisId: string) => request<Portfolio>(`/theses/${thesisId}/portfolio`),
+  addPosition: (thesisId: string, data: PositionCreateInput) =>
+    request<PortfolioPosition>(`/theses/${thesisId}/portfolio/positions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updatePosition: (positionId: string, data: Partial<PositionUpdateInput>) =>
+    request<PortfolioPosition>(`/portfolio/positions/${positionId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  deletePosition: (positionId: string) =>
+    request(`/portfolio/positions/${positionId}`, { method: "DELETE" }),
+
   // Macro
   getMacroHeader: () => request<MacroHeader>("/macro/header"),
 };
@@ -204,9 +219,17 @@ export interface MacroHeader {
 export interface ScoringBreakdownFeed {
   name: string;
   value: number | null;
+  formattedValue: string | null;
   normalizedScore: number | null;
   status: string;
   lastUpdated: string | null;
+  seriesId: string | null;
+  keyword: string | null;
+  source: string | null;
+  confirmingDirection: string | null;
+  pctVs1yr: number | null;
+  pctVs5yrAvg: number | null;
+  context: string | null;
 }
 
 export interface EvidenceDimension {
@@ -270,4 +293,53 @@ export interface OpportunityCreateInput {
   one_liner: string;
   timing: string;
   time_horizon: string;
+}
+
+export interface PortfolioPosition {
+  id: string;
+  thesisId: string;
+  ticker: string;
+  shares: number;
+  entryPrice: number;
+  entryDate: string | null;
+  isShort: boolean;
+  currentPrice: number | null;
+  currentValue: number | null;
+  pnl: number | null;
+  pnlPct: number | null;
+  lastUpdated: string | null;
+  isClosed: boolean;
+  closedAt: string | null;
+  closePrice: number | null;
+}
+
+export interface Portfolio {
+  positions: PortfolioPosition[];
+  totalValue: number;
+  totalCost: number;
+  totalPnl: number;
+  totalPnlPct: number;
+  thiScore: number;
+  interpretation: string;
+  history: {
+    date: string;
+    totalValue: number;
+    totalPnl: number;
+    totalPnlPct: number;
+    thiScore: number | null;
+  }[];
+}
+
+export interface PositionCreateInput {
+  ticker: string;
+  shares: number;
+  entry_price: number;
+  is_short?: boolean;
+}
+
+export interface PositionUpdateInput {
+  shares?: number;
+  current_price?: number;
+  is_closed?: boolean;
+  close_price?: number;
 }

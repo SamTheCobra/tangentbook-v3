@@ -232,3 +232,39 @@ class MacroHeader(Base):
     ten_year_two_year_spread = Column(Float, nullable=True)
     vix = Column(Float, nullable=True)
     last_updated = Column(DateTime, default=datetime.utcnow)
+
+
+class PortfolioPosition(Base):
+    __tablename__ = "portfolio_positions"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    thesis_id = Column(String, ForeignKey("theses.id"), nullable=False)
+    ticker = Column(String, nullable=False)
+    shares = Column(Float, nullable=False)
+    entry_price = Column(Float, nullable=False)
+    entry_date = Column(DateTime, default=datetime.utcnow)
+    is_short = Column(Boolean, default=False)
+    current_price = Column(Float, nullable=True)
+    current_value = Column(Float, nullable=True)
+    pnl = Column(Float, nullable=True)
+    pnl_pct = Column(Float, nullable=True)
+    last_updated = Column(DateTime, nullable=True)
+    is_closed = Column(Boolean, default=False)
+    closed_at = Column(DateTime, nullable=True)
+    close_price = Column(Float, nullable=True)
+
+    thesis = relationship("Thesis", backref="portfolio_positions")
+
+
+class PortfolioSnapshot(Base):
+    __tablename__ = "portfolio_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    thesis_id = Column(String, ForeignKey("theses.id"), nullable=False)
+    total_value = Column(Float, nullable=False)
+    total_pnl = Column(Float, nullable=False)
+    total_pnl_pct = Column(Float, nullable=False)
+    thi_score = Column(Float, nullable=True)
+    computed_at = Column(DateTime, default=datetime.utcnow)
+
+    thesis = relationship("Thesis", backref="portfolio_snapshots")
