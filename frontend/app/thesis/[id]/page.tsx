@@ -156,50 +156,60 @@ export default function ThesisDetailPage() {
 
         <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
 
-        {/* Sub-needles row */}
-        <div className="flex gap-12 mb-8" style={{ overflow: "visible" }}>
-          <div className="text-center" style={{ overflow: "visible" }}>
-            <Needle
-              score={thesis.thi.evidence.score}
-              size="md"
-              label="EVIDENCE"
-              formulaText="Flow(35%) + Structural(30%) + Adoption(20%) + Policy(15%)"
-            />
-            <span
-              className="uppercase block"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px", marginTop: "2px" }}
-            >
-              WEIGHT {(thesis.thi.evidence.weight * 100).toFixed(0)}%
-            </span>
-          </div>
-          <div className="text-center" style={{ overflow: "visible" }}>
-            <Needle
-              score={thesis.thi.momentum.score}
-              size="md"
-              label="MOMENTUM"
-              formulaText="Short(50%) + Medium(35%) + Long(15%) rate-of-change"
-            />
-            <span
-              className="uppercase block"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px", marginTop: "2px" }}
-            >
-              WEIGHT {(thesis.thi.momentum.weight * 100).toFixed(0)}%
-            </span>
-          </div>
-          <div className="text-center" style={{ overflow: "visible" }}>
-            <Needle
-              score={thesis.thi.conviction.score}
-              size="md"
-              label="DATA QUALITY"
-              formulaText="Agreement(50%) + Freshness(30%) + Source(20%)"
-            />
-            <span
-              className="uppercase block"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px", marginTop: "2px" }}
-            >
-              WEIGHT {(thesis.thi.conviction.weight * 100).toFixed(0)}%
-            </span>
-          </div>
+        {/* Scoring Breakdown Panel */}
+        <h3
+          className="uppercase mb-4"
+          style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
+        >
+          SCORING BREAKDOWN
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-4">
+          <ScoreColumn
+            label="EVIDENCE"
+            score={thesis.thi.evidence.score}
+            weight={thesis.thi.evidence.weight}
+            description="Measures whether real-world data confirms the thesis is happening. Higher means more data points are moving in the predicted direction."
+            breakdowns={[
+              { label: "FLOW", pct: 35 },
+              { label: "STRUCTURAL", pct: 30 },
+              { label: "ADOPTION", pct: 20 },
+              { label: "POLICY", pct: 15 },
+            ]}
+          />
+          <ScoreColumn
+            label="MOMENTUM"
+            score={thesis.thi.momentum.score}
+            weight={thesis.thi.momentum.weight}
+            description="Measures whether the thesis is accelerating or decelerating. Compares recent data changes across multiple time windows."
+            breakdowns={[
+              { label: "30D", pct: 50 },
+              { label: "90D", pct: 35 },
+              { label: "1YR", pct: 15 },
+            ]}
+          />
+          <ScoreColumn
+            label="DATA QUALITY"
+            score={thesis.thi.conviction.score}
+            weight={thesis.thi.conviction.weight}
+            description="Measures how trustworthy the score is. Low quality means feeds disagree, data is stale, or sources are unreliable."
+            breakdowns={[
+              { label: "AGREEMENT", pct: 50 },
+              { label: "FRESHNESS", pct: 30 },
+              { label: "SRC QUAL", pct: 20 },
+            ]}
+          />
+        </div>
+
+        <div
+          className="text-center mb-8"
+          style={{
+            color: "var(--text-muted)",
+            fontSize: "12px",
+            letterSpacing: "0.04em",
+            fontFamily: "JetBrains Mono, monospace",
+          }}
+        >
+          ↑ These scores are computed from the FEEDS section below
         </div>
 
         <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
@@ -311,6 +321,117 @@ function formatRawValue(feed: Feed): string {
   return v.toFixed(2);
 }
 
+function ScoreColumn({
+  label,
+  score,
+  weight,
+  description,
+  breakdowns,
+}: {
+  label: string;
+  score: number;
+  weight: number;
+  description: string;
+  breakdowns: { label: string; pct: number }[];
+}) {
+  return (
+    <div
+      className="border p-5"
+      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+    >
+      {/* Label + weight + score */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="uppercase font-bold"
+            style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}
+          >
+            {label}
+          </span>
+          <span
+            className="uppercase"
+            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
+          >
+            {(weight * 100).toFixed(0)}%
+          </span>
+        </div>
+        <span
+          style={{
+            color: "#E8440A",
+            fontFamily: "JetBrains Mono, monospace",
+            fontSize: "20px",
+            fontWeight: "bold",
+          }}
+        >
+          {Math.round(score)}
+        </span>
+      </div>
+
+      {/* Needle */}
+      <div className="flex justify-center mb-3">
+        <Needle score={score} size="sm" label="" animated={true} />
+      </div>
+
+      {/* Description */}
+      <p
+        style={{
+          color: "var(--text-muted)",
+          fontSize: "13px",
+          lineHeight: "1.5",
+          marginBottom: "16px",
+        }}
+      >
+        {description}
+      </p>
+
+      {/* Sub-breakdowns */}
+      <div className="flex flex-col gap-2">
+        {breakdowns.map((b) => (
+          <div key={b.label} className="flex items-center gap-3">
+            <span
+              className="uppercase flex-shrink-0"
+              style={{
+                color: "var(--text-muted)",
+                letterSpacing: "0.08em",
+                fontSize: "11px",
+                width: "80px",
+              }}
+            >
+              {b.label}
+            </span>
+            <div
+              style={{
+                width: "40px",
+                height: "4px",
+                background: "#2A2A2A",
+                position: "relative",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: `${b.pct}%`,
+                  height: "100%",
+                  background: "#E8440A",
+                }}
+              />
+            </div>
+            <span
+              style={{
+                color: "var(--text-muted)",
+                fontFamily: "JetBrains Mono, monospace",
+                fontSize: "11px",
+              }}
+            >
+              {b.pct}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function FeedPanel({
   feeds,
   feedsOpen,
@@ -377,6 +498,62 @@ function FeedPanel({
 
       {feedsOpen && (
         <div className="border" style={{ borderColor: "var(--border)" }}>
+          {/* Column headers */}
+          <div
+            className="px-4 py-2 flex items-center gap-4"
+            style={{ background: "var(--bg)", borderBottom: "1px solid var(--border)" }}
+          >
+            <span style={{ width: "12px", flexShrink: 0 }} />
+            <span
+              className="flex-1 min-w-0 uppercase"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
+            >
+              SOURCE / FEED NAME &amp; KEYWORD
+            </span>
+            <span
+              className="flex-shrink-0 uppercase"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px", minWidth: "60px", textAlign: "right" }}
+            >
+              RAW VALUE
+            </span>
+            <div className="flex items-center gap-1 flex-shrink-0" style={{ width: "100px" }}>
+              <span
+                className="uppercase"
+                style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
+              >
+                NORMALIZED
+              </span>
+              <span
+                title="Score from 0-100 based on where this value sits in its 5-year historical range"
+                style={{
+                  color: "var(--text-muted)",
+                  fontSize: "11px",
+                  cursor: "help",
+                  border: "1px solid var(--border)",
+                  width: "14px",
+                  height: "14px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: "1",
+                }}
+              >
+                ?
+              </span>
+            </div>
+            <span
+              className="flex-shrink-0 uppercase"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px", minWidth: "80px", textAlign: "right" }}
+            >
+              LAST UPDATED
+            </span>
+            <span
+              className="flex-shrink-0 uppercase"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px", minWidth: "60px", textAlign: "right" }}
+            >
+              STATUS
+            </span>
+          </div>
           {feeds.map((feed, i) => {
             const isExpanded = expandedFeed === feed.id;
             const score = feed.normalizedScore != null ? Math.round(feed.normalizedScore) : null;
