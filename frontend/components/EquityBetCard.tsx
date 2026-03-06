@@ -132,7 +132,7 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
 
   return (
     <div
-      className="border-b"
+      className="border-b border-r flex flex-col"
       style={{ background: "var(--surface)", borderColor: "var(--border)", overflow: "hidden" }}
     >
       {/* Header row: Ticker */}
@@ -310,7 +310,7 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
       </div>
 
       {/* Body */}
-      <div className="px-5 pt-3 pb-5">
+      <div className="px-5 pt-3 pb-5 flex flex-col flex-1">
         {/* Company name */}
         <div
           className="mb-2"
@@ -331,8 +331,10 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
               color: "var(--text-muted)",
               lineHeight: "1.5",
               fontSize: "13px",
-              wordWrap: "break-word",
-              overflowWrap: "break-word",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
             }}
           >
             {bet.companyDescription}
@@ -345,15 +347,17 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
             color: "var(--text-muted)",
             lineHeight: "1.5",
             fontSize: "14px",
-            wordWrap: "break-word",
-            overflowWrap: "break-word",
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
           }}
         >
           {bet.rationale}
         </p>
 
         {/* Footer: Role + Feedback + Time horizon */}
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-auto pt-3 flex items-center gap-3">
           <span
             className="uppercase px-2 py-0.5 border"
             style={{
