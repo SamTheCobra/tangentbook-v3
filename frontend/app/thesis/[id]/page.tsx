@@ -16,6 +16,7 @@ import {
   Effect,
   ScoringBreakdown,
   EvidenceDimension,
+  ScoringBreakdownFeed,
   Portfolio,
 } from "@/lib/api";
 
@@ -109,7 +110,10 @@ export default function ThesisDetailPage() {
   const eScore = Math.round(thesis.thi.evidence.score);
   const mScore = Math.round(thesis.thi.momentum.score);
   const cScore = Math.round(thesis.thi.conviction.score);
-  const thiFormula = `THI = Evidence(${eScore}) × 0.50 + Momentum(${mScore}) × 0.30 + Quality(${cScore}) × 0.20`;
+  const eContrib = (eScore * 0.50).toFixed(1);
+  const mContrib = (mScore * 0.30).toFixed(1);
+  const cContrib = (cScore * 0.20).toFixed(1);
+  const thiTotal = (eScore * 0.50 + mScore * 0.30 + cScore * 0.20).toFixed(1);
 
   return (
     <ErrorBoundary>
@@ -231,13 +235,26 @@ export default function ThesisDetailPage() {
                 score={thesis.thi.score}
                 size="lg"
                 label="THESIS HEALTH INDEX"
-                formulaText={thiFormula}
               />
+              <div style={{ fontFamily: "JetBrains Mono, monospace", marginTop: "8px", lineHeight: "1.6" }}>
+                <div style={{ fontSize: "12px", color: "#5A5A5A" }}>
+                  THI = (Evidence × 0.50) + (Momentum × 0.30) + (Quality × 0.20)
+                </div>
+                <div style={{ fontSize: "12px", color: "#5A5A5A" }}>
+                  THI = ({eScore} × 0.50) + ({mScore} × 0.30) + ({cScore} × 0.20)
+                </div>
+                <div style={{ fontSize: "12px", color: "#5A5A5A" }}>
+                  THI = {eContrib} + {mContrib} + {cContrib}
+                </div>
+                <div style={{ fontSize: "14px", color: "#FF4500", fontWeight: "bold" }}>
+                  THI = {thiTotal} → rounded to {Math.round(Number(thiTotal))}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Collapsible scoring breakdown trigger */}
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center justify-between mb-6">
             <button
               onClick={() => setScoringOpen(!scoringOpen)}
               className="uppercase flex items-center gap-2"
@@ -269,7 +286,7 @@ export default function ThesisDetailPage() {
                 opacity: refreshing ? 0.5 : 1,
               }}
             >
-              {refreshing ? "REFRESHING..." : "REFRESH FEEDS"}
+              {refreshing ? "REFRESHING..." : "REFRESH FEEDS ↺"}
             </button>
           </div>
 
@@ -382,10 +399,10 @@ export default function ThesisDetailPage() {
 function EvidenceColumn({ breakdown }: { breakdown: ScoringBreakdown }) {
   const ev = breakdown.evidence;
   const dims = [
-    { key: "flow", label: "FLOW", data: ev.flow },
-    { key: "structural", label: "STRUCTURAL", data: ev.structural },
-    { key: "adoption", label: "ADOPTION", data: ev.adoption },
-    { key: "policy", label: "POLICY", data: ev.policy },
+    { key: "flow", label: "Flow signals", data: ev.flow },
+    { key: "structural", label: "Structural signals", data: ev.structural },
+    { key: "adoption", label: "Adoption signals", data: ev.adoption },
+    { key: "policy", label: "Policy signals", data: ev.policy },
   ];
 
   return (
@@ -393,43 +410,47 @@ function EvidenceColumn({ breakdown }: { breakdown: ScoringBreakdown }) {
       className="border p-5"
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span
-            className="uppercase font-bold"
-            style={{
-              color: "var(--text)",
-              letterSpacing: "0.08em",
-              fontSize: "13px",
-            }}
-          >
-            EVIDENCE
-          </span>
-          <span
-            className="uppercase"
-            style={{
-              color: "var(--text-muted)",
-              letterSpacing: "0.08em",
-              fontSize: "11px",
-            }}
-          >
-            50%
+      <div className="mb-3">
+        <div className="flex items-center justify-between">
+          <span className="uppercase font-bold" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}>
+            EVIDENCE SCORE: {Math.round(ev.score)} / 100
           </span>
         </div>
-        <span
-          style={{
-            color: "var(--accent)",
-            fontFamily: "JetBrains Mono, monospace",
-            fontSize: "20px",
-            fontWeight: "bold",
-          }}
-        >
-          {Math.round(ev.score)}
-        </span>
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+          Weight in final THI: 50%
+        </div>
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--accent)", marginTop: "2px" }}>
+          Contribution to THI: {Math.round(ev.score)} × 0.50 = {ev.contribution} points
+        </div>
       </div>
       <div className="flex justify-center mb-4">
         <Needle score={ev.score} size="sm" label="" animated={true} />
       </div>
+      <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", fontStyle: "italic" }}>
+        How it&apos;s calculated:
+      </div>
+      {dims.map(({ key, label, data }) => {
+        const dimScore = data.score != null ? Math.round(data.score) : 0;
+        const contrib = ev.dimContributions?.[key] ?? 0;
+        return (
+          <div key={key} className="mb-1" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px" }}>
+            <span style={{ color: "var(--text-muted)" }}>
+              {label} ({(data.weight * 100).toFixed(0)}% of Evidence) →{" "}
+            </span>
+            <span style={{ color: dimScore > 0 ? "var(--accent)" : "var(--text-muted)" }}>
+              score {dimScore}
+            </span>
+            <span style={{ color: "var(--text-muted)" }}>
+              {" "}→ contributes {contrib.toFixed(1)} pts
+            </span>
+          </div>
+        );
+      })}
+      <div style={{ borderTop: "1px solid var(--border)", margin: "8px 0" }} />
+      <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)" }}>
+        Evidence = {ev.formula} = {Math.round(ev.score)}
+      </div>
+      <div style={{ borderTop: "1px solid var(--border)", margin: "12px 0" }} />
       <div className="flex flex-col gap-4">
         {dims.map(({ key, label, data }) => (
           <DimensionBlock key={key} label={label} dim={data} />
@@ -449,18 +470,8 @@ function DimensionBlock({
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span
-          className="uppercase"
-          style={{
-            color: "var(--text)",
-            letterSpacing: "0.08em",
-            fontSize: "11px",
-          }}
-        >
-          {label}{" "}
-          <span style={{ color: "var(--text-muted)" }}>
-            {(dim.weight * 100).toFixed(0)}%
-          </span>
+        <span className="uppercase" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "11px" }}>
+          {label}
         </span>
         <span
           style={{
@@ -469,94 +480,101 @@ function DimensionBlock({
             fontSize: "13px",
           }}
         >
-          {dim.score != null ? Math.round(dim.score) : "—"}
+          {dim.score != null ? `${Math.round(dim.score)} / 100` : "—"}
         </span>
       </div>
-      <p
-        style={{
-          color: "var(--text-muted)",
-          fontSize: "11px",
-          lineHeight: "1.4",
-          marginBottom: "4px",
-        }}
-      >
+      <p style={{ color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4", marginBottom: "6px" }}>
         {dim.description}
       </p>
       {dim.feeds.length > 0 ? (
         <div style={{ fontSize: "11px" }}>
           {dim.feeds.map((f) => (
-            <div
-              key={f.name}
-              className="mb-2 pb-2"
-              style={{ borderBottom: "1px solid var(--border)" }}
-            >
-              <div className="flex items-center justify-between" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                <span style={{ color: "var(--text-muted)" }}>
-                  {f.name}{" "}
-                  <span
-                    style={{
-                      color: f.status === "live" ? "var(--status-live)" : "var(--status-stale)",
-                      fontSize: "9px",
-                    }}
-                  >
-                    ●
-                  </span>
-                </span>
-                <span style={{ color: f.normalizedScore != null ? "var(--accent)" : "var(--text-muted)" }}>
-                  {f.normalizedScore != null ? f.normalizedScore : "—"}
-                </span>
-              </div>
-              {f.formattedValue && (
-                <div style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--text)", fontSize: "12px", marginTop: "2px" }}>
-                  {f.formattedValue}
-                  {f.seriesId && <span style={{ color: "var(--text-muted)", marginLeft: "6px" }}>{f.seriesId}</span>}
-                  {f.keyword && <span style={{ color: "var(--text-muted)", marginLeft: "6px" }}>&quot;{f.keyword}&quot;</span>}
-                </div>
-              )}
-              <div style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", fontSize: "10px", marginTop: "2px" }}>
-                {f.pctVs1yr != null && (
-                  <span style={{ color: f.pctVs1yr >= 0 ? "#FF4500" : "var(--text-muted)" }}>
-                    vs 1yr: {f.pctVs1yr >= 0 ? "+" : ""}{f.pctVs1yr}%
-                  </span>
-                )}
-                {f.pctVs1yr != null && f.pctVs5yrAvg != null && <span> · </span>}
-                {f.pctVs5yrAvg != null && (
-                  <span style={{ color: f.pctVs5yrAvg >= 0 ? "#FF4500" : "var(--text-muted)" }}>
-                    vs 5yr avg: {f.pctVs5yrAvg >= 0 ? "+" : ""}{f.pctVs5yrAvg}%
-                  </span>
-                )}
-              </div>
-              {f.context && (
-                <div style={{ color: "var(--text-muted)", fontSize: "10px", lineHeight: "1.4", marginTop: "2px" }}>
-                  {f.context}
-                </div>
-              )}
-            </div>
+            <FeedRow key={f.name} feed={f} />
           ))}
         </div>
       ) : (
-        <span
-          style={{
-            color: "var(--text-muted)",
-            fontSize: "11px",
-            fontStyle: "italic",
-          }}
-        >
+        <span style={{ color: "var(--text-muted)", fontSize: "11px", fontStyle: "italic" }}>
           No {label.toLowerCase()} feeds configured
         </span>
       )}
-      {dim.lastUpdated && (
-        <div
-          style={{
-            color: "#242424",
-            fontSize: "10px",
-            fontFamily: "JetBrains Mono, monospace",
-            marginTop: "2px",
-          }}
-        >
-          Updated {new Date(dim.lastUpdated).toLocaleDateString()}
+    </div>
+  );
+}
+
+function FeedRow({ feed: f }: { feed: ScoringBreakdownFeed }) {
+  const statusLabel = f.status === "live" ? "LIVE" : f.status === "stale" ? "STALE" : f.status === "degraded" ? "DEGRADED" : "OFFLINE";
+  const statusColor = f.status === "live" ? "var(--status-live)" : f.status === "stale" ? "#F59E0B" : "#EF4444";
+  const sourceLabel = f.source === "FRED" ? `FRED: ${f.seriesId}` : f.source === "GTRENDS" ? `GTrends: "${f.keyword}"` : f.source || "";
+
+  // Live feed with data
+  if (f.status === "live" && f.normalizedScore != null) {
+    return (
+      <div className="mb-3 pb-3" style={{ borderBottom: "1px solid var(--border)" }}>
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text)", fontWeight: "bold" }}>
+          {f.name} ({sourceLabel})
         </div>
-      )}
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", marginTop: "3px" }}>
+          <span style={{ color: "var(--text)" }}>Current: {f.formattedValue || "—"}</span>
+          <span style={{ color: "var(--text-muted)" }}>{" "}|{" "}</span>
+          <span style={{ color: "var(--accent)" }}>Score: {f.normalizedScore} / 100</span>
+        </div>
+        {(f.pctVs1yr != null || f.pctVs5yrAvg != null) && (
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "10px", marginTop: "2px", color: "var(--text-muted)" }}>
+            {f.pctVs1yr != null && (
+              <span>
+                1yr ago → <span style={{ color: f.pctVs1yr >= 0 ? "#FF4500" : "var(--text-muted)" }}>
+                  {f.pctVs1yr >= 0 ? "UP" : "DOWN"} {Math.abs(f.pctVs1yr)}%
+                </span>
+                {f.confirmingDirection && (
+                  <span> — {f.pctVs1yr >= 0 === (f.confirmingDirection === "higher") ? "CONFIRMING" : "REFUTING"}{" "}
+                    ({f.confirmingDirection} = confirming)
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+        )}
+        {f.lastUpdated && (
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "10px", marginTop: "2px", color: "var(--text-muted)" }}>
+            Last updated: {new Date(f.lastUpdated).toLocaleString()}{" "}|{" "}Status: <span style={{ color: statusColor }}>{statusLabel}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Degraded feed
+  if (f.status === "degraded" || f.status === "stale") {
+    return (
+      <div className="mb-3 pb-3" style={{ borderBottom: "1px solid var(--border)" }}>
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text-muted)" }}>
+          {f.name} ({sourceLabel})
+        </div>
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", marginTop: "3px", color: statusColor }}>
+          {f.formattedValue ? (
+            <>Last known: {f.formattedValue} — DATA {statusLabel}</>
+          ) : (
+            <>No data fetched yet. Click REFRESH FEEDS to pull latest.</>
+          )}
+        </div>
+        {f.normalizedScore != null && (
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "10px", marginTop: "2px", color: "var(--text-muted)" }}>
+            Score held at last known value: {f.normalizedScore}. Marked {statusLabel}.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // No data yet
+  return (
+    <div className="mb-3 pb-3" style={{ borderBottom: "1px solid var(--border)" }}>
+      <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text-muted)" }}>
+        {f.name} ({sourceLabel})
+      </div>
+      <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", marginTop: "3px", color: "var(--text-muted)" }}>
+        No data fetched yet. Click REFRESH FEEDS to pull latest.
+      </div>
     </div>
   );
 }
@@ -564,312 +582,179 @@ function DimensionBlock({
 function MomentumColumn({ breakdown }: { breakdown: ScoringBreakdown }) {
   const m = breakdown.momentum;
   const entries = [
-    {
-      label: "30D MOMENTUM",
-      weight: "50%",
-      desc: "How much has the evidence score changed in the last 30 days? Positive = thesis accelerating.",
-      data: m.thirtyDay,
-    },
-    {
-      label: "90D MOMENTUM",
-      weight: "35%",
-      desc: "Medium-term direction — smooths out noise from the 30-day view.",
-      data: m.ninetyDay,
-    },
-    {
-      label: "1YR MOMENTUM",
-      weight: "15%",
-      desc: "Long-term structural direction — is this thesis gaining or losing ground over a full year?",
-      data: m.oneYear,
-    },
+    { label: "30-day change", weight: "50%", weightNum: 0.50, data: m.thirtyDay },
+    { label: "90-day change", weight: "35%", weightNum: 0.35, data: m.ninetyDay },
+    { label: "1-year change", weight: "15%", weightNum: 0.15, data: m.oneYear },
   ];
+
+  const mFormula = `(${Math.round(m.thirtyDay.score)}×0.50) + (${Math.round(m.ninetyDay.score)}×0.35) + (${Math.round(m.oneYear.score)}×0.15)`;
 
   return (
     <div
       className="border p-5"
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span
-            className="uppercase font-bold"
-            style={{
-              color: "var(--text)",
-              letterSpacing: "0.08em",
-              fontSize: "13px",
-            }}
-          >
-            MOMENTUM
-          </span>
-          <span
-            className="uppercase"
-            style={{
-              color: "var(--text-muted)",
-              letterSpacing: "0.08em",
-              fontSize: "11px",
-            }}
-          >
-            30%
+      <div className="mb-3">
+        <div className="flex items-center justify-between">
+          <span className="uppercase font-bold" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}>
+            MOMENTUM SCORE: {Math.round(m.score)} / 100
           </span>
         </div>
-        <span
-          style={{
-            color: "var(--accent)",
-            fontFamily: "JetBrains Mono, monospace",
-            fontSize: "20px",
-            fontWeight: "bold",
-          }}
-        >
-          {Math.round(m.score)}
-        </span>
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+          Weight in final THI: 30%
+        </div>
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--accent)", marginTop: "2px" }}>
+          Contribution to THI: {Math.round(m.score)} × 0.30 = {m.contribution} points
+        </div>
       </div>
       <div className="flex justify-center mb-4">
         <Needle score={m.score} size="sm" label="" animated={true} />
       </div>
-      <div className="flex flex-col gap-4">
-        {entries.map((e) => (
-          <div key={e.label}>
-            <div className="flex items-center justify-between mb-1">
-              <span
-                className="uppercase"
-                style={{
-                  color: "var(--text)",
-                  letterSpacing: "0.08em",
-                  fontSize: "11px",
-                }}
-              >
-                {e.label}{" "}
-                <span style={{ color: "var(--text-muted)" }}>{e.weight}</span>
-              </span>
-              <span
-                style={{
-                  color: "var(--accent)",
-                  fontFamily: "JetBrains Mono, monospace",
-                  fontSize: "13px",
-                }}
-              >
-                {Math.round(e.data.score)}
-              </span>
-            </div>
-            <p
-              style={{
-                color: "var(--text-muted)",
-                fontSize: "11px",
-                lineHeight: "1.4",
-                marginBottom: "4px",
-              }}
-            >
-              {e.desc}
-            </p>
-            <div
-              style={{
-                fontFamily: "JetBrains Mono, monospace",
-                fontSize: "12px",
-                color:
-                  e.data.delta != null && e.data.delta >= 0
-                    ? "#FF4500"
-                    : "var(--text-muted)",
-              }}
-            >
-              {e.data.delta != null
-                ? `${e.data.delta >= 0 ? "+" : ""}${e.data.delta} points`
-                : "— insufficient history"}
-            </div>
+
+      {!m.hasEnoughHistory ? (
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.6" }}>
+          Not enough historical snapshots yet to compute momentum.
+          Score defaults to 50 (neutral) until 30 days of data exists.
+          {m.firstSnapshotDate && (
+            <> First snapshot: {new Date(m.firstSnapshotDate).toLocaleDateString()}.</>
+          )}
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", fontStyle: "italic" }}>
+            How it&apos;s calculated:
           </div>
-        ))}
-      </div>
+          <div className="flex flex-col gap-4">
+            {entries.map((e) => (
+              <div key={e.label}>
+                <div className="flex items-center justify-between mb-1">
+                  <span style={{ color: "var(--text)", fontSize: "11px" }}>
+                    {e.label} ({e.weight} of Momentum)
+                  </span>
+                  <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+                    {Math.round(e.data.score)}
+                  </span>
+                </div>
+                <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.5" }}>
+                  {e.data.delta != null && e.data.prevEvidence != null ? (
+                    <>
+                      Evidence was {e.data.prevEvidence} on{" "}
+                      {e.data.prevDate ? new Date(e.data.prevDate).toLocaleDateString() : "?"} → {m.currentEvidence} today
+                      <br />
+                      <span style={{ color: e.data.delta >= 0 ? "#FF4500" : "var(--text-muted)" }}>
+                        Delta: {e.data.delta >= 0 ? "+" : ""}{e.data.delta} pts → score {Math.round(e.data.score)}
+                        {e.data.delta === 0 ? " (neutral)" : e.data.delta > 0 ? " (strengthening)" : " (weakening)"}
+                      </span>
+                    </>
+                  ) : (
+                    <span>— insufficient history for this window</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ borderTop: "1px solid var(--border)", margin: "8px 0" }} />
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)" }}>
+            Momentum = {mFormula} = {Math.round(m.score)}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 function DataQualityColumn({ breakdown }: { breakdown: ScoringBreakdown }) {
   const dq = breakdown.dataQuality;
+  const dqFormula = `(${Math.round(dq.agreement.score)}×0.50) + (${Math.round(dq.freshness.score)}×0.30) + (${Math.round(dq.sourceQuality.score)}×0.20)`;
 
   return (
     <div
       className="border p-5"
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span
-            className="uppercase font-bold"
-            style={{
-              color: "var(--text)",
-              letterSpacing: "0.08em",
-              fontSize: "13px",
-            }}
-          >
-            DATA QUALITY
-          </span>
-          <span
-            className="uppercase"
-            style={{
-              color: "var(--text-muted)",
-              letterSpacing: "0.08em",
-              fontSize: "11px",
-            }}
-          >
-            20%
+      <div className="mb-3">
+        <div className="flex items-center justify-between">
+          <span className="uppercase font-bold" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}>
+            DATA QUALITY SCORE: {Math.round(dq.score)} / 100
           </span>
         </div>
-        <span
-          style={{
-            color: "var(--accent)",
-            fontFamily: "JetBrains Mono, monospace",
-            fontSize: "20px",
-            fontWeight: "bold",
-          }}
-        >
-          {Math.round(dq.score)}
-        </span>
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+          Weight in final THI: 20%
+        </div>
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--accent)", marginTop: "2px" }}>
+          Contribution to THI: {Math.round(dq.score)} × 0.20 = {dq.contribution} points
+        </div>
       </div>
       <div className="flex justify-center mb-4">
         <Needle score={dq.score} size="sm" label="" animated={true} />
+      </div>
+      <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", fontStyle: "italic" }}>
+        How it&apos;s calculated:
       </div>
       <div className="flex flex-col gap-4">
         {/* Agreement */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span
-              className="uppercase"
-              style={{
-                color: "var(--text)",
-                letterSpacing: "0.08em",
-                fontSize: "11px",
-              }}
-            >
-              AGREEMENT{" "}
-              <span style={{ color: "var(--text-muted)" }}>50%</span>
+            <span style={{ color: "var(--text)", fontSize: "11px" }}>
+              Feed Agreement (50% of Quality)
             </span>
-            <span
-              style={{
-                color: "var(--accent)",
-                fontFamily: "JetBrains Mono, monospace",
-                fontSize: "13px",
-              }}
-            >
+            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
               {Math.round(dq.agreement.score)}
             </span>
           </div>
-          <p
-            style={{
-              color: "var(--text-muted)",
-              fontSize: "11px",
-              lineHeight: "1.4",
-              marginBottom: "4px",
-            }}
-          >
-            Do the feeds agree with each other? If some say &quot;confirming&quot; but
-            others say &quot;refuting&quot;, confidence is low.
-          </p>
-          <div
-            style={{
-              fontFamily: "JetBrains Mono, monospace",
-              fontSize: "12px",
-              color: "var(--text-muted)",
-            }}
-          >
-            {dq.agreement.pctConfirming != null
-              ? `${dq.agreement.pctConfirming}% of feeds pointing confirming`
-              : "— no scored feeds"}
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.5" }}>
+            {dq.agreement.scoredCount > 0 ? (
+              <>
+                {dq.agreement.scoredCount} of {dq.agreement.totalCount} feeds returning scores.
+                <br />
+                {dq.agreement.pctConfirming != null && `${dq.agreement.pctConfirming}% of scored feeds pointing confirming.`}
+              </>
+            ) : (
+              "— no scored feeds yet"
+            )}
           </div>
         </div>
 
         {/* Freshness */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span
-              className="uppercase"
-              style={{
-                color: "var(--text)",
-                letterSpacing: "0.08em",
-                fontSize: "11px",
-              }}
-            >
-              FRESHNESS{" "}
-              <span style={{ color: "var(--text-muted)" }}>30%</span>
+            <span style={{ color: "var(--text)", fontSize: "11px" }}>
+              Data Freshness (30% of Quality)
             </span>
-            <span
-              style={{
-                color: "var(--accent)",
-                fontFamily: "JetBrains Mono, monospace",
-                fontSize: "13px",
-              }}
-            >
+            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
               {Math.round(dq.freshness.score)}
             </span>
           </div>
-          <p
-            style={{
-              color: "var(--text-muted)",
-              fontSize: "11px",
-              lineHeight: "1.4",
-              marginBottom: "4px",
-            }}
-          >
-            How recent is the data? Stale data = less reliable score.
-          </p>
-          <div
-            style={{
-              fontFamily: "JetBrains Mono, monospace",
-              fontSize: "12px",
-              color: "var(--text-muted)",
-            }}
-          >
-            {dq.freshness.avgAgeDays != null
-              ? `Avg age: ${dq.freshness.avgAgeDays}d`
-              : "— no data"}{" "}
-            · {dq.freshness.live} live / {dq.freshness.stale} stale /{" "}
-            {dq.freshness.degraded} degraded
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.5" }}>
+            {dq.freshness.degraded > 0 && `${dq.freshness.degraded} feeds degraded (no recent data). `}
+            {dq.freshness.avgAgeDays != null ? `Avg data age: ${dq.freshness.avgAgeDays}d. ` : ""}
+            {dq.freshness.live} live / {dq.freshness.stale} stale / {dq.freshness.degraded} degraded.
+            {dq.freshness.score === 0 && <><br />Score: 0 — fix feeds to improve this.</>}
           </div>
         </div>
 
         {/* Source Quality */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span
-              className="uppercase"
-              style={{
-                color: "var(--text)",
-                letterSpacing: "0.08em",
-                fontSize: "11px",
-              }}
-            >
-              SOURCE QUALITY{" "}
-              <span style={{ color: "var(--text-muted)" }}>20%</span>
+            <span style={{ color: "var(--text)", fontSize: "11px" }}>
+              Source Quality (20% of Quality)
             </span>
-            <span
-              style={{
-                color: "var(--accent)",
-                fontFamily: "JetBrains Mono, monospace",
-                fontSize: "13px",
-              }}
-            >
+            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
               {Math.round(dq.sourceQuality.score)}
             </span>
           </div>
-          <p
-            style={{
-              color: "var(--text-muted)",
-              fontSize: "11px",
-              lineHeight: "1.4",
-              marginBottom: "4px",
-            }}
-          >
-            Are these feeds from authoritative sources? FRED/BLS = 100. Google
-            Trends = 65. Estimated = 20.
-          </p>
-          <div
-            style={{
-              fontFamily: "JetBrains Mono, monospace",
-              fontSize: "12px",
-              color: "var(--text-muted)",
-            }}
-          >
-            Weighted avg: {dq.sourceQuality.weightedAvg}/100
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.5" }}>
+            Active sources: {dq.sourceQuality.activeSources.length > 0
+              ? dq.sourceQuality.activeSources.map(s => `${s} (${s === "FRED" ? "100" : s === "GTRENDS" ? "65" : "50"})`).join(", ")
+              : "none yet"}
+            <br />
+            Weighted avg: {dq.sourceQuality.weightedAvg}/100 → score {Math.round(dq.sourceQuality.score)}
           </div>
         </div>
+      </div>
+      <div style={{ borderTop: "1px solid var(--border)", margin: "8px 0" }} />
+      <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)" }}>
+        Quality = {dqFormula} = {Math.round(dq.score)}
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ Feed Refresh Service
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -28,7 +28,10 @@ async def refresh_thesis_feeds(thesis_id: str, db: Session):
     if not thesis:
         return
 
-    feeds = db.query(DataFeed).filter(DataFeed.thesis_id == thesis_id).all()
+    feeds = db.query(DataFeed).filter(
+        DataFeed.thesis_id == thesis_id,
+        DataFeed.effect_id.is_(None),
+    ).all()
     if not feeds:
         return
 

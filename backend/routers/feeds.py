@@ -4,7 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db, SessionLocal
-from models import DataFeed, FeedCache, Thesis, MacroHeader, THISnapshot
+from models import DataFeed, FeedCache, Thesis, Effect, MacroHeader, THISnapshot
 from services.feed_refresh import refresh_thesis_feeds, refresh_macro_header
 from services.scoring_engine import clamp
 
@@ -33,7 +33,10 @@ def feed_to_dict(f: DataFeed) -> dict:
 
 @router.get("/theses/{thesis_id}/feeds")
 def list_feeds(thesis_id: str, db: Session = Depends(get_db)):
-    feeds = db.query(DataFeed).filter(DataFeed.thesis_id == thesis_id).all()
+    feeds = db.query(DataFeed).filter(
+        DataFeed.thesis_id == thesis_id,
+        DataFeed.effect_id.is_(None),
+    ).all()
     return [feed_to_dict(f) for f in feeds]
 
 
@@ -73,6 +76,24 @@ async def refresh_macro(db: Session = Depends(get_db)):
         "tenYearTwoYearSpread": header.ten_year_two_year_spread if header else None,
         "vix": header.vix if header else None,
     }
+
+
+@router.post("/feeds/{feed_id}/refresh")
+async def refresh_single_feed(feed_id: str, db: Session = Depends(get_db)):
+    """Refresh a single feed."""
+    feed = db.query(DataFeed).filter(DataFeed.id == feed_id).first()
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+    from services.feed_refresh import _fetch_single_feed
+    from services.scoring_engine import normalize_percentile
+    result = await _fetch_single_feed(feed, db)
+    if result and result.get("observations"):
+        score = normalize_percentile(result["value"], result["observations"])
+        if feed.confirming_direction == "lower":
+            score = 100.0 - score
+        feed.normalized_score = score
+        db.commit()
+    return feed_to_dict(feed)
 
 
 @router.get("/feeds/{feed_id}/history")
@@ -144,7 +165,11 @@ def scoring_breakdown(thesis_id: str, db: Session = Depends(get_db)):
     if not thesis:
         raise HTTPException(status_code=404, detail="Thesis not found")
 
-    feeds = db.query(DataFeed).filter(DataFeed.thesis_id == thesis_id).all()
+    feeds = db.query(DataFeed).filter(
+        DataFeed.thesis_id == thesis_id,
+        DataFeed.effect_id.is_(None),
+    ).all()
+    now = datetime.utcnow()
 
     # ── EVIDENCE BREAKDOWN ────────────────────────────────────────────────
     dimensions: dict[str, dict] = {}
@@ -293,7 +318,6 @@ def scoring_breakdown(thesis_id: str, db: Session = Depends(get_db)):
         }
 
     # ── MOMENTUM BREAKDOWN ────────────────────────────────────────────────
-    now = datetime.utcnow()
     snapshots = (
         db.query(THISnapshot)
         .filter(THISnapshot.thesis_id == thesis_id)
@@ -318,14 +342,36 @@ def scoring_breakdown(thesis_id: str, db: Session = Depends(get_db)):
 
     def momentum_entry(snap, label_days):
         if not snap or snap.evidence_score is None:
-            return {"delta": None, "score": 50.0}
+            return {
+                "delta": None,
+                "score": 50.0,
+                "prevEvidence": None,
+                "prevDate": None,
+            }
         delta = round(current_evidence - snap.evidence_score, 1)
         score = clamp(round(50 + delta * 2.5, 1))
-        return {"delta": delta, "score": score}
+        return {
+            "delta": delta,
+            "score": score,
+            "prevEvidence": round(snap.evidence_score, 1),
+            "prevDate": snap.computed_at.isoformat() if snap.computed_at else None,
+        }
 
     momentum_30d = momentum_entry(snap_30d, 30)
     momentum_90d = momentum_entry(snap_90d, 90)
     momentum_1yr = momentum_entry(snap_1yr, 365)
+
+    # Compute actual momentum score
+    m_score = round(
+        momentum_30d["score"] * 0.50 +
+        momentum_90d["score"] * 0.35 +
+        momentum_1yr["score"] * 0.15, 1
+    )
+
+    # First snapshot date for "momentum will unlock" message
+    first_snapshot = snapshots[-1] if snapshots else None
+    first_snapshot_date = first_snapshot.computed_at.isoformat() if first_snapshot else None
+    has_enough_history = len(snapshots) >= 2
 
     # ── DATA QUALITY BREAKDOWN ────────────────────────────────────────────
     live_feeds = [f for f in feeds if f.status == "live"]
@@ -360,25 +406,300 @@ def scoring_breakdown(thesis_id: str, db: Session = Depends(get_db)):
     weighted_sq = round(sum(sq_values) / len(sq_values)) if sq_values else 50
     sq_score = float(weighted_sq)
 
+    # Compute actual data quality score
+    dq_score = round(agreement_score * 0.50 + freshness_score * 0.30 + sq_score * 0.20, 1)
+
+    # Dimension contribution calculations
+    ev_score = thesis.evidence_score
+    dim_contributions = {}
+    for dim_key in ["flow", "structural", "adoption", "policy"]:
+        d = dimensions.get(dim_key, {})
+        w = d.get("weight", 0)
+        s = d.get("score")
+        contrib = round(s * w, 1) if s is not None else 0
+        dim_contributions[dim_key] = contrib
+
+    # Evidence formula string
+    ev_formula_parts = []
+    for dim_key in ["flow", "structural", "adoption", "policy"]:
+        d = dimensions.get(dim_key, {})
+        s = d.get("score")
+        w = d.get("weight", 0)
+        s_str = str(round(s)) if s is not None else "0"
+        ev_formula_parts.append(f"({s_str}×{w})")
+    ev_formula = " + ".join(ev_formula_parts)
+
+    # THI formula
+    thi_score = thesis.thi_score
+    ev_contrib = round(ev_score * 0.50, 1)
+    m_contrib = round(thesis.momentum_score * 0.30, 1)
+    dq_contrib = round(thesis.conviction_data_score * 0.20, 1)
+
+    return _build_breakdown_response(
+        thi_score, ev_score, thesis.momentum_score, thesis.conviction_data_score,
+        ev_contrib, m_contrib, dq_contrib, ev_formula, dimensions, dim_contributions,
+        has_enough_history, first_snapshot_date, current_evidence,
+        momentum_30d, momentum_90d, momentum_1yr,
+        total, scored_feeds, agreement_score, pct_confirming,
+        avg_age, live_feeds, stale_feeds, degraded_feeds, offline_feeds,
+        freshness_score, weighted_sq, sq_score,
+    )
+
+
+@router.get("/effects/{effect_id}/scoring-breakdown")
+def effect_scoring_breakdown(effect_id: str, db: Session = Depends(get_db)):
+    """Scoring breakdown for an effect using its own feeds."""
+    effect = db.query(Effect).filter(Effect.id == effect_id).first()
+    if not effect:
+        raise HTTPException(status_code=404, detail="Effect not found")
+
+    feeds = db.query(DataFeed).filter(DataFeed.effect_id == effect_id).all()
+
+    # If effect has no feeds, return a minimal breakdown with defaults
+    if not feeds:
+        return _empty_breakdown(effect.thi_score)
+
+    now = datetime.utcnow()
+
+    # Reuse same logic as thesis breakdown
+    all_cache = db.query(FeedCache).filter(
+        FeedCache.feed_id.in_([f.id for f in feeds])
+    ).order_by(FeedCache.fetched_at).all()
+    cache_by_feed: dict[str, list] = {}
+    for c in all_cache:
+        cache_by_feed.setdefault(c.feed_id, []).append(c)
+
+    dimensions: dict[str, dict] = {}
+    for dim_key, dim_cfg in EVIDENCE_DIMENSIONS.items():
+        dim_feeds = [f for f in feeds if f.source_type == dim_key]
+        feed_list = []
+        scores = []
+        latest_update = None
+        for f in dim_feeds:
+            score = f.normalized_score
+            if score is not None:
+                scores.append(score)
+            lu = f.last_fetched
+            if lu and (latest_update is None or lu > latest_update):
+                latest_update = lu
+            feed_list.append({
+                "name": f.name.replace("Fred ", "").replace("Gtrends ", ""),
+                "value": f.raw_value,
+                "formattedValue": _format_feed_value(f),
+                "normalizedScore": round(score) if score is not None else None,
+                "status": f.status,
+                "lastUpdated": lu.isoformat() if lu else None,
+                "seriesId": f.series_id,
+                "keyword": f.keyword,
+                "source": f.source,
+                "confirmingDirection": f.confirming_direction,
+                "pctVs1yr": None,
+                "pctVs5yrAvg": None,
+                "context": _get_feed_context(f),
+            })
+        dim_score = round(sum(scores) / len(scores), 1) if scores else None
+        dimensions[dim_key] = {
+            "weight": dim_cfg["weight"],
+            "description": dim_cfg["description"],
+            "score": dim_score,
+            "feeds": feed_list,
+            "lastUpdated": latest_update.isoformat() if latest_update else None,
+        }
+
+    # Evidence
+    all_dim_scores = []
+    for dk in ["flow", "structural", "adoption", "policy"]:
+        d = dimensions.get(dk, {})
+        if d.get("score") is not None:
+            all_dim_scores.append((d["score"], d["weight"]))
+    if all_dim_scores:
+        ev_score = round(sum(s * w for s, w in all_dim_scores) / sum(w for _, w in all_dim_scores) if all_dim_scores else 50, 1)
+    else:
+        ev_score = 50.0
+
+    # Momentum: effects don't have snapshots yet, default to 50
+    m_score = 50.0
+
+    # Data quality
+    live_feeds_list = [f for f in feeds if f.status == "live"]
+    stale_feeds_list = [f for f in feeds if f.status == "stale"]
+    degraded_feeds_list = [f for f in feeds if f.status == "degraded"]
+    offline_feeds_list = [f for f in feeds if f.status == "offline"]
+    total = len(feeds) or 1
+    scored_feeds_list = [f for f in feeds if f.normalized_score is not None]
+    confirming = sum(1 for f in scored_feeds_list if f.normalized_score >= 50)
+    pct_conf = round((confirming / len(scored_feeds_list)) * 100) if scored_feeds_list else None
+    agr_score = 75.0
+    if len(scored_feeds_list) >= 2:
+        mean = sum(f.normalized_score for f in scored_feeds_list) / len(scored_feeds_list)
+        var = sum((f.normalized_score - mean) ** 2 for f in scored_feeds_list) / len(scored_feeds_list)
+        agr_score = clamp(round(100 - var ** 0.5 * 2))
+    ages = [(now - f.last_fetched).total_seconds() / 86400 for f in feeds if f.last_fetched]
+    avg_age = round(sum(ages) / len(ages), 1) if ages else None
+    fresh_score = clamp(round((len(live_feeds_list) / total) * 100))
+    sq_vals = [SOURCE_QUALITY.get(f.source, 50) for f in feeds]
+    wsq = round(sum(sq_vals) / len(sq_vals)) if sq_vals else 50
+    dq_score = round(agr_score * 0.50 + fresh_score * 0.30 + float(wsq) * 0.20, 1)
+
+    # Compute THI
+    thi = round(ev_score * 0.50 + m_score * 0.30 + dq_score * 0.20, 1)
+
+    ev_contrib = round(ev_score * 0.50, 1)
+    m_contrib = round(m_score * 0.30, 1)
+    dq_contrib = round(dq_score * 0.20, 1)
+
+    dim_contribs = {}
+    ev_parts = []
+    for dk in ["flow", "structural", "adoption", "policy"]:
+        d = dimensions.get(dk, {})
+        s = d.get("score")
+        w = d.get("weight", 0)
+        dim_contribs[dk] = round(s * w, 1) if s is not None else 0
+        ev_parts.append(f"({round(s) if s is not None else 0}×{w})")
+
+    return _build_breakdown_response(
+        thi, ev_score, m_score, dq_score,
+        ev_contrib, m_contrib, dq_contrib,
+        " + ".join(ev_parts), dimensions, dim_contribs,
+        False, None, ev_score,
+        {"delta": None, "score": 50.0, "prevEvidence": None, "prevDate": None},
+        {"delta": None, "score": 50.0, "prevEvidence": None, "prevDate": None},
+        {"delta": None, "score": 50.0, "prevEvidence": None, "prevDate": None},
+        total, scored_feeds_list, agr_score, pct_conf,
+        avg_age, live_feeds_list, stale_feeds_list, degraded_feeds_list, offline_feeds_list,
+        fresh_score, wsq, float(wsq),
+    )
+
+
+@router.post("/effects/{effect_id}/feeds/refresh")
+async def refresh_effect_feeds(effect_id: str, db: Session = Depends(get_db)):
+    """Refresh all feeds for a single effect and recompute its THI."""
+    effect = db.query(Effect).filter(Effect.id == effect_id).first()
+    if not effect:
+        raise HTTPException(status_code=404, detail="Effect not found")
+
+    feeds = db.query(DataFeed).filter(DataFeed.effect_id == effect_id).all()
+    if not feeds:
+        return {"status": "no_feeds", "effectId": effect_id}
+
+    from services.feed_refresh import _fetch_single_feed
+    from services.scoring_engine import normalize_percentile, clamp, score_to_direction, compute_trend
+
+    for feed in feeds:
+        result = await _fetch_single_feed(feed, db)
+        if result and result.get("observations"):
+            score = normalize_percentile(result["value"], result["observations"])
+            if feed.confirming_direction == "lower":
+                score = 100.0 - score
+            feed.normalized_score = score
+            db.commit()
+
+    # Recompute effect THI from its own feeds
+    scored = [f for f in feeds if f.normalized_score is not None]
+    if scored:
+        ev = round(sum(f.normalized_score for f in scored) / len(scored), 1)
+    else:
+        ev = 50.0
+    old = effect.thi_score
+    thi = clamp(round(ev * 0.50 + 50 * 0.30 + 50 * 0.20, 1))
+    effect.thi_score = thi
+    effect.thi_direction = score_to_direction(thi)
+    effect.thi_trend = compute_trend(thi, old)
+    db.commit()
+
+    return {"status": "refreshed", "effectId": effect_id, "thiScore": thi}
+
+
+def _format_feed_value(f_obj):
+    if f_obj.raw_value is None:
+        return None
+    if f_obj.source == "GTRENDS":
+        return f"{f_obj.raw_value:.0f}/100"
+    return f"{f_obj.raw_value:.2f}"
+
+
+def _get_feed_context(f_obj):
+    if f_obj.raw_value is None:
+        return "No data available yet."
+    score = f_obj.normalized_score
+    if score is None:
+        return "Awaiting normalization."
+    direction = f_obj.confirming_direction or "higher"
+    if score >= 70:
+        strength = "strongly confirming"
+    elif score >= 55:
+        strength = "mildly confirming"
+    elif score >= 45:
+        strength = "neutral for"
+    elif score >= 30:
+        strength = "mildly refuting"
+    else:
+        strength = "strongly refuting"
+    return f"Currently {strength} this thesis. ({direction} = confirming)"
+
+
+def _empty_breakdown(thi_score):
+    """Return a minimal breakdown when no feeds exist."""
+    empty_dim = {"weight": 0, "description": "No feeds configured", "score": None, "feeds": [], "lastUpdated": None}
     return {
+        "thiScore": thi_score,
+        "thiFormula": {"evidenceScore": 50, "momentumScore": 50, "qualityScore": 50, "evidenceContrib": 25, "momentumContrib": 15, "qualityContrib": 10},
+        "evidence": {"score": 50, "contribution": 25, "formula": "(50×0.35) + (50×0.30) + (50×0.20) + (50×0.15)", "flow": empty_dim, "structural": empty_dim, "adoption": empty_dim, "policy": empty_dim, "dimContributions": {"flow": 0, "structural": 0, "adoption": 0, "policy": 0}},
+        "momentum": {"score": 50, "contribution": 15, "hasEnoughHistory": False, "firstSnapshotDate": None, "currentEvidence": 50, "thirtyDay": {"delta": None, "score": 50, "prevEvidence": None, "prevDate": None}, "ninetyDay": {"delta": None, "score": 50, "prevEvidence": None, "prevDate": None}, "oneYear": {"delta": None, "score": 50, "prevEvidence": None, "prevDate": None}},
+        "dataQuality": {"score": 50, "contribution": 10, "totalFeeds": 0, "scoredFeeds": 0, "agreement": {"pctConfirming": None, "score": 75, "scoredCount": 0, "totalCount": 0}, "freshness": {"avgAgeDays": None, "live": 0, "stale": 0, "degraded": 0, "offline": 0, "score": 0}, "sourceQuality": {"weightedAvg": 50, "score": 50, "activeSources": []}},
+    }
+
+
+def _build_breakdown_response(
+    thi_score, ev_score, m_score, dq_score,
+    ev_contrib, m_contrib, dq_contrib,
+    ev_formula, dimensions, dim_contributions,
+    has_enough_history, first_snapshot_date, current_evidence,
+    momentum_30d, momentum_90d, momentum_1yr,
+    total, scored_feeds, agreement_score, pct_confirming,
+    avg_age, live_feeds, stale_feeds, degraded_feeds, offline_feeds,
+    freshness_score, weighted_sq, sq_score,
+):
+    return {
+        "thiScore": thi_score,
+        "thiFormula": {
+            "evidenceScore": round(ev_score, 1),
+            "momentumScore": round(m_score, 1),
+            "qualityScore": round(dq_score, 1),
+            "evidenceContrib": ev_contrib,
+            "momentumContrib": m_contrib,
+            "qualityContrib": dq_contrib,
+        },
         "evidence": {
-            "score": thesis.evidence_score,
+            "score": ev_score,
+            "contribution": ev_contrib,
+            "formula": ev_formula,
             "flow": dimensions.get("flow"),
             "structural": dimensions.get("structural"),
             "adoption": dimensions.get("adoption"),
             "policy": dimensions.get("policy"),
+            "dimContributions": dim_contributions,
         },
         "momentum": {
-            "score": thesis.momentum_score,
+            "score": m_score,
+            "contribution": m_contrib,
+            "hasEnoughHistory": has_enough_history,
+            "firstSnapshotDate": first_snapshot_date,
+            "currentEvidence": round(current_evidence, 1),
             "thirtyDay": momentum_30d,
             "ninetyDay": momentum_90d,
             "oneYear": momentum_1yr,
         },
         "dataQuality": {
-            "score": thesis.conviction_data_score,
+            "score": dq_score,
+            "contribution": dq_contrib,
+            "totalFeeds": total,
+            "scoredFeeds": len(scored_feeds),
             "agreement": {
                 "pctConfirming": pct_confirming,
                 "score": agreement_score,
+                "scoredCount": len(scored_feeds),
+                "totalCount": total,
             },
             "freshness": {
                 "avgAgeDays": avg_age,
@@ -391,6 +712,7 @@ def scoring_breakdown(thesis_id: str, db: Session = Depends(get_db)):
             "sourceQuality": {
                 "weightedAvg": weighted_sq,
                 "score": sq_score,
+                "activeSources": list(set(f.source for f in scored_feeds)),
             },
         },
     }

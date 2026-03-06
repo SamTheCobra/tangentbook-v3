@@ -77,11 +77,18 @@ export const api = {
 
   // Scoring
   getScoringBreakdown: (thesisId: string) => request<ScoringBreakdown>(`/theses/${thesisId}/scoring-breakdown`),
+  getEffectScoringBreakdown: (effectId: string) => request<ScoringBreakdown>(`/effects/${effectId}/scoring-breakdown`),
+
+  // Effect feeds
+  refreshEffectFeeds: (effectId: string) =>
+    request(`/effects/${effectId}/feeds/refresh`, { method: "POST" }),
 
   // Feeds
   getFeeds: (thesisId: string) => request<Feed[]>(`/theses/${thesisId}/feeds`),
   refreshFeeds: (thesisId: string) =>
     request(`/theses/${thesisId}/feeds/refresh`, { method: "POST" }),
+  refreshSingleFeed: (feedId: string) =>
+    request(`/feeds/${feedId}/refresh`, { method: "POST" }),
   getFeedHistory: (feedId: string) => request(`/feeds/${feedId}/history`),
 
   // Portfolio
@@ -240,25 +247,51 @@ export interface EvidenceDimension {
   lastUpdated: string | null;
 }
 
+export interface MomentumEntry {
+  delta: number | null;
+  score: number;
+  prevEvidence: number | null;
+  prevDate: string | null;
+}
+
 export interface ScoringBreakdown {
+  thiScore: number;
+  thiFormula: {
+    evidenceScore: number;
+    momentumScore: number;
+    qualityScore: number;
+    evidenceContrib: number;
+    momentumContrib: number;
+    qualityContrib: number;
+  };
   evidence: {
     score: number;
+    contribution: number;
+    formula: string;
     flow: EvidenceDimension;
     structural: EvidenceDimension;
     adoption: EvidenceDimension;
     policy: EvidenceDimension;
+    dimContributions: Record<string, number>;
   };
   momentum: {
     score: number;
-    thirtyDay: { delta: number | null; score: number };
-    ninetyDay: { delta: number | null; score: number };
-    oneYear: { delta: number | null; score: number };
+    contribution: number;
+    hasEnoughHistory: boolean;
+    firstSnapshotDate: string | null;
+    currentEvidence: number;
+    thirtyDay: MomentumEntry;
+    ninetyDay: MomentumEntry;
+    oneYear: MomentumEntry;
   };
   dataQuality: {
     score: number;
-    agreement: { pctConfirming: number | null; score: number };
+    contribution: number;
+    totalFeeds: number;
+    scoredFeeds: number;
+    agreement: { pctConfirming: number | null; score: number; scoredCount: number; totalCount: number };
     freshness: { avgAgeDays: number | null; live: number; stale: number; degraded: number; offline: number; score: number };
-    sourceQuality: { weightedAvg: number; score: number };
+    sourceQuality: { weightedAvg: number; score: number; activeSources: string[] };
   };
 }
 

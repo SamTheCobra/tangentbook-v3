@@ -88,6 +88,8 @@ class Effect(Base):
                                foreign_keys="EquityBet.effect_id")
     startup_opportunities = relationship("StartupOpportunity", back_populates="effect",
                                          cascade="all, delete-orphan", foreign_keys="StartupOpportunity.effect_id")
+    feeds = relationship("DataFeed", backref="effect", cascade="all, delete-orphan",
+                          foreign_keys="DataFeed.effect_id")
     indicators = relationship("Indicator", back_populates="effect", cascade="all, delete-orphan")
     conviction_history = relationship("ConvictionSnapshot", back_populates="effect",
                                        cascade="all, delete-orphan", foreign_keys="ConvictionSnapshot.effect_id")
@@ -97,7 +99,8 @@ class DataFeed(Base):
     __tablename__ = "data_feeds"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    thesis_id = Column(String, ForeignKey("theses.id"), nullable=False)
+    thesis_id = Column(String, ForeignKey("theses.id"), nullable=True)
+    effect_id = Column(String, ForeignKey("effects.id"), nullable=True)
     name = Column(String, nullable=False)
     description = Column(Text, default="")
     source = Column(String, nullable=False)  # FRED, ALPHA_VANTAGE, GTRENDS, EDGAR, etc.
