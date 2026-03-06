@@ -24,10 +24,10 @@ export default function Header({ onNewThesis }: HeaderProps) {
         borderColor: "var(--border)",
       }}
     >
-      <div className="flex items-center gap-8">
+      <div className="flex items-center gap-8 min-w-0">
         <Link
           href="/"
-          className="font-bold text-xl uppercase"
+          className="font-bold text-xl uppercase flex-shrink-0"
           style={{
             color: "var(--text)",
             letterSpacing: "-0.04em",
@@ -39,7 +39,7 @@ export default function Header({ onNewThesis }: HeaderProps) {
         </Link>
 
         {macro && (
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-6 flex-wrap">
             <MacroItem label="REGIME" value={macro.regime || "N/A"} />
             <MacroItem
               label="FFR"

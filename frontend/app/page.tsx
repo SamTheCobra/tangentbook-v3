@@ -105,7 +105,8 @@ export default function Home() {
                       {tab}
                     </button>
                   ))}
-                  <span style={{ color: "var(--border)" }}>|</span>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-3" style={{ maxWidth: "100%" }}>
                   {allTags.map((tag) => (
                     <button
                       key={tag}
@@ -115,14 +116,31 @@ export default function Home() {
                         color: tagFilter === tag ? "var(--accent)" : "var(--text-muted)",
                         letterSpacing: "0.08em",
                         background: "none",
-                        border: "none",
+                        border: tagFilter === tag ? "1px solid var(--accent)" : "1px solid var(--border)",
                         cursor: "pointer",
-                        fontSize: "12px",
+                        fontSize: "11px",
+                        padding: "2px 8px",
                       }}
                     >
                       {tag}
                     </button>
                   ))}
+                  {tagFilter && (
+                    <button
+                      onClick={() => setTagFilter(null)}
+                      className="uppercase"
+                      style={{
+                        color: "var(--text-muted)",
+                        letterSpacing: "0.08em",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "11px",
+                      }}
+                    >
+                      CLEAR
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3">
