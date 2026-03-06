@@ -21,6 +21,15 @@ function getComputedCSSVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+// Map score to wedge opacity
+function scoreToOpacity(score: number): number {
+  const s = Math.max(0, Math.min(100, score));
+  if (s <= 30) return 0.05 + (s / 30) * 0.10;        // 0.05–0.15
+  if (s <= 60) return 0.15 + ((s - 30) / 30) * 0.15;  // 0.15–0.30
+  if (s <= 80) return 0.30 + ((s - 60) / 20) * 0.20;  // 0.30–0.50
+  return 0.50 + ((s - 80) / 20) * 0.20;                // 0.50–0.70
+}
+
 export default function Needle({ score, size = "md", label = "THI", animated = true, formulaText }: NeedleProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [displayScore, setDisplayScore] = useState(animated ? 0 : score);
@@ -72,7 +81,6 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     ctx.scale(dpr, dpr);
 
     const muted = getComputedCSSVar("--text-muted") || "#8A8580";
-    const accent = getComputedCSSVar("--accent") || "#E8440A";
 
     ctx.clearRect(0, 0, cfg.width, cfg.height);
 
@@ -80,21 +88,41 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     const cy = cfg.height * 0.72;
     const radius = cfg.needleLen + 8;
 
-    // Single-color arc — very dark, barely visible
+    const clampedScore = Math.max(0, Math.min(100, displayScore));
+    const needleAngle = Math.PI + (clampedScore / 100) * Math.PI;
+
+    // ── 1. Swept wedge fill (drawn first, behind everything) ──
+    if (clampedScore > 0.5) {
+      const wedgeOpacity = scoreToOpacity(clampedScore);
+
+      // Create radial gradient from pivot to arc edge
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      grad.addColorStop(0, `rgba(232, 68, 10, ${wedgeOpacity})`);
+      grad.addColorStop(1, `rgba(232, 68, 10, ${wedgeOpacity * 0.4})`);
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius, Math.PI, needleAngle);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    // ── 2. Dark arc background ──
     ctx.beginPath();
     ctx.arc(cx, cy, radius, Math.PI, Math.PI * 2);
     ctx.strokeStyle = "#1E1B18";
     ctx.lineWidth = cfg.strokeWidth + 4;
     ctx.stroke();
 
-    // Arc outline
+    // ── 3. Arc outline ──
     ctx.beginPath();
     ctx.arc(cx, cy, radius, Math.PI, Math.PI * 2);
     ctx.strokeStyle = "#2A2723";
     ctx.lineWidth = cfg.strokeWidth;
     ctx.stroke();
 
-    // Tick marks
+    // ── 4. Tick marks ──
     for (let i = 0; i <= 10; i++) {
       const angle = Math.PI + (i / 10) * Math.PI;
       const tickInner = radius - (i % 5 === 0 ? 8 : 4);
@@ -107,33 +135,31 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
       ctx.stroke();
     }
 
-    // Needle
-    const clampedScore = Math.max(0, Math.min(100, displayScore));
-    const needleAngle = Math.PI + (clampedScore / 100) * Math.PI;
+    // ── 5. Needle line ──
     const needleX = cx + cfg.needleLen * Math.cos(needleAngle);
     const needleY = cy + cfg.needleLen * Math.sin(needleAngle);
 
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(needleX, needleY);
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = cfg.strokeWidth;
+    ctx.strokeStyle = "#E8440A";
+    ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.stroke();
 
-    // Needle tip dot
+    // ── 6. Needle tip dot ──
     ctx.beginPath();
     ctx.arc(needleX, needleY, size === "lg" ? 4 : 3, 0, Math.PI * 2);
-    ctx.fillStyle = accent;
+    ctx.fillStyle = "#E8440A";
     ctx.fill();
 
-    // Center dot
+    // ── 7. Pivot dot ──
     ctx.beginPath();
     ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-    ctx.fillStyle = accent;
+    ctx.fillStyle = "#E8440A";
     ctx.fill();
 
-    // REFUTED / CONFIRMED labels on canvas
+    // ── 8. REFUTED / CONFIRMED labels ──
     if (size !== "sm") {
       const labelFontSize = size === "lg" ? 11 : 9;
       ctx.font = `${labelFontSize}px Inter, system-ui, sans-serif`;
@@ -145,9 +171,9 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
       ctx.fillText("CONFIRMED", cx + radius + 4, cy + (size === "lg" ? 18 : 14));
     }
 
-    // Score text — orange
+    // ── 9. Score text ──
     ctx.font = `bold ${cfg.fontSize}px "JetBrains Mono", monospace`;
-    ctx.fillStyle = accent;
+    ctx.fillStyle = "#E8440A";
     ctx.textAlign = "center";
     ctx.fillText(Math.round(displayScore).toString(), cx, cy + cfg.fontSize + (size === "lg" ? 12 : 6));
   }, [displayScore, size]);
@@ -165,35 +191,18 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
 
   const cfg = SIZES[size];
 
-  // Glow dimensions: center at pivot point (bottom-center of semicircle)
-  const glowCx = cfg.width / 2;
-  const glowCy = cfg.height * 0.72;
-  const glowRadius = size === "lg" ? 180 : size === "md" ? 100 : 55;
-  const glowOpacity = size === "lg" ? 0.14 : size === "md" ? 0.15 : 0.12;
-
   return (
     <div
       className="flex flex-col items-center"
       style={{ overflow: "visible", paddingBottom: size === "lg" ? "24px" : size === "md" ? "20px" : "8px" }}
     >
-      {/* Canvas with radial glow background */}
-      <div
-        style={{
-          position: "relative",
-          width: cfg.width,
-          height: cfg.height,
-          overflow: "visible",
-          background: `radial-gradient(circle at ${glowCx}px ${glowCy}px, rgba(232, 68, 10, ${glowOpacity}) 0%, rgba(232, 68, 10, 0) ${glowRadius}px)`,
-        }}
-      >
-        <canvas
-          ref={canvasRef}
-          style={{ width: cfg.width, height: cfg.height, position: "relative", zIndex: 1 }}
-          className="block"
-        />
-      </div>
+      <canvas
+        ref={canvasRef}
+        style={{ width: cfg.width, height: cfg.height }}
+        className="block"
+      />
 
-      {/* Label — rendered as HTML, fully visible */}
+      {/* Label */}
       <div
         className="text-center uppercase"
         style={{
