@@ -3,8 +3,6 @@
 import { EquityBet } from "@/lib/api";
 import StockSparkline from "./StockSparkline";
 
-const ALL_ROLES = ["BENEFICIARY", "HEADWIND", "CANARY"] as const;
-
 interface EquityBetCardProps {
   bet: EquityBet;
 }
@@ -12,10 +10,10 @@ interface EquityBetCardProps {
 export default function EquityBetCard({ bet }: EquityBetCardProps) {
   return (
     <div
-      className="border"
+      className="border-b"
       style={{ background: "var(--surface)", borderColor: "var(--border)", overflow: "hidden" }}
     >
-      {/* Header row: Ticker + Role badges */}
+      {/* Header row: Ticker */}
       <div className="flex items-center gap-3 px-5 pt-5 pb-2">
         <span
           className="font-bold"
@@ -28,25 +26,6 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
         >
           {bet.ticker}
         </span>
-        <div className="flex items-center gap-1.5">
-          {ALL_ROLES.map((role) => {
-            const isActive = bet.role === role;
-            return (
-              <span
-                key={role}
-                className="uppercase px-2 py-0.5 border"
-                style={{
-                  color: isActive ? "#FF4500" : "#242424",
-                  borderColor: isActive ? "#FF4500" : "#242424",
-                  letterSpacing: "0.08em",
-                  fontSize: "11px",
-                }}
-              >
-                {role}
-              </span>
-            );
-          })}
-        </div>
       </div>
 
       {/* Sparkline row: full card width */}

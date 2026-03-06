@@ -20,7 +20,7 @@ export default function EffectDetailPage() {
   const [effect, setEffect] = useState<Effect | null>(null);
   const [breakdown, setBreakdown] = useState<ScoringBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scoringOpen, setScoringOpen] = useState(false);
+  const [scoringOpen, setScoringOpen] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"bets" | "startups">("bets");
 
@@ -217,12 +217,17 @@ export default function EffectDetailPage() {
           </button>
         </div>
 
+        {scoringOpen && !breakdown && (
+          <div className="mb-4 p-3 border" style={{ borderColor: "var(--text-muted)", color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>
+            Loading scoring data...
+          </div>
+        )}
         {scoringOpen && breakdown && (
           <div className="mb-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-4">
-              <EvidenceColumn breakdown={breakdown} />
-              <MomentumColumn breakdown={breakdown} />
-              <DataQualityColumn breakdown={breakdown} />
+              <ErrorBoundary><EvidenceColumn breakdown={breakdown} /></ErrorBoundary>
+              <ErrorBoundary><MomentumColumn breakdown={breakdown} /></ErrorBoundary>
+              <ErrorBoundary><DataQualityColumn breakdown={breakdown} /></ErrorBoundary>
             </div>
           </div>
         )}
@@ -246,19 +251,25 @@ export default function EffectDetailPage() {
                 onClick={() => setActiveTab("startups")}
               />
             </div>
-            {activeTab === "bets" && effect.equityBets.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
-                {effect.equityBets.map((bet) => (
-                  <EquityBetCard key={bet.id} bet={bet} />
-                ))}
-              </div>
+            {activeTab === "bets" && (
+              <CategoryColumns
+                items={effect.equityBets}
+                getRole={(bet) => bet.role}
+                renderItem={(bet) => <EquityBetCard key={bet.id} bet={bet} />}
+                emptyNoun="stocks"
+              />
             )}
-            {activeTab === "startups" && effect.startupOpportunities.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
-                {effect.startupOpportunities.map((opp) => (
-                  <StartupCard key={opp.id} opportunity={opp} />
-                ))}
-              </div>
+            {activeTab === "startups" && (
+              <CategoryColumns
+                items={effect.startupOpportunities}
+                getRole={(opp) => {
+                  if (opp.timing === "RIGHT_TIMING") return "BENEFICIARY";
+                  if (opp.timing === "TOO_EARLY") return "HEADWIND";
+                  return "CANARY";
+                }}
+                renderItem={(opp) => <StartupCard key={opp.id} opportunity={opp} />}
+                emptyNoun="startups"
+              />
             )}
           </>
         )}
@@ -310,6 +321,115 @@ function TabButton({ label, active, onClick }: { label: string; active: boolean;
     >
       {label}
     </button>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CATEGORY COLUMNS — 3-column layout for bets & startups
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const CATEGORY_COLUMNS = [
+  {
+    role: "BENEFICIARY",
+    label: "RIDE THE WAVE",
+    color: "#FF4500",
+    description: "Stocks/startups that win directly because this thesis plays out. Build here now.",
+  },
+  {
+    role: "HEADWIND",
+    label: "FIGHT THE TIDE",
+    color: "#5A5A5A",
+    description: "Stocks/startups solving the problems this thesis creates for incumbents being disrupted.",
+  },
+  {
+    role: "CANARY",
+    label: "WATCH THIS SPACE",
+    color: "var(--text)",
+    description: "Stocks/startups whose traction tells you how fast the thesis is actually moving.",
+  },
+];
+
+function CategoryColumns<T extends { id: string }>({
+  items,
+  getRole,
+  renderItem,
+  emptyNoun,
+}: {
+  items: T[];
+  getRole: (item: T) => string;
+  renderItem: (item: T) => React.ReactNode;
+  emptyNoun: string;
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
+      {CATEGORY_COLUMNS.map((col, colIdx) => {
+        const filtered = items.filter((item) => getRole(item) === col.role);
+        return (
+          <div
+            key={col.role}
+            style={{
+              borderRight: colIdx < 2 ? "1px solid var(--border)" : undefined,
+            }}
+          >
+            {/* Sticky column header */}
+            <div
+              className="sticky top-0 z-10 p-4 border-b"
+              style={{
+                background: "var(--bg)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 8,
+                    height: 8,
+                    background: col.color,
+                  }}
+                />
+                <span
+                  className="uppercase font-bold"
+                  style={{
+                    color: "var(--text)",
+                    letterSpacing: "0.08em",
+                    fontSize: "13px",
+                  }}
+                >
+                  {col.label}
+                </span>
+              </div>
+              <p
+                style={{
+                  color: "var(--text-muted)",
+                  fontSize: "11px",
+                  fontStyle: "italic",
+                  lineHeight: "1.4",
+                  margin: 0,
+                }}
+              >
+                {col.description}
+              </p>
+            </div>
+            {/* Cards */}
+            {filtered.length > 0 ? (
+              filtered.map((item) => renderItem(item))
+            ) : (
+              <div
+                className="p-4"
+                style={{
+                  color: "var(--text-muted)",
+                  fontSize: "12px",
+                  fontStyle: "italic",
+                }}
+              >
+                No {col.label.toLowerCase()} {emptyNoun} identified yet
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
