@@ -12,10 +12,16 @@ interface StockData {
   pctChanges: string[];
 }
 
+interface TooltipState {
+  index: number;
+  x: number;
+  y: number;
+}
+
 export default function StockSparkline({ ticker }: StockSparklineProps) {
   const [data, setData] = useState<StockData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tooltip, setTooltip] = useState(false);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   useEffect(() => {
     fetch(`/api/stock/${ticker}`)
@@ -29,14 +35,12 @@ export default function StockSparkline({ ticker }: StockSparklineProps) {
       .finally(() => setLoading(false));
   }, [ticker]);
 
-  // Loading skeleton
   if (loading) {
     return (
       <div style={{ width: "100%", height: 36, background: "var(--surface-alt)" }} />
     );
   }
 
-  // Fallback: flat grey line if no data
   if (!data || data.prices.length < 2) {
     return (
       <div style={{ width: "100%", height: 36, overflow: "hidden" }}>
@@ -64,25 +68,30 @@ export default function StockSparkline({ ticker }: StockSparklineProps) {
   const isUp = prices[prices.length - 1] > prices[0];
   const color = isUp ? "#FF4500" : "#5A5A5A";
 
-  // Last 5 months for tooltip
-  const tooltipEntries = pctChanges.slice(-5).map((pct, i) => {
-    const dateIdx = dates.length - 5 + i;
-    return {
-      date: dates[dateIdx] || "",
-      pct,
-    };
-  });
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const index = Math.round((x / rect.width) * (prices.length - 1));
+    const clamped = Math.max(0, Math.min(prices.length - 1, index));
+    setTooltip({ index: clamped, x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseLeave = () => {
+    setTooltip(null);
+  };
+
+  // pctChanges is offset by 1 (index 0 of pctChanges = change from price[0] to price[1])
+  const tooltipPctIdx = tooltip ? tooltip.index - 1 : -1;
+  const tooltipPct = tooltipPctIdx >= 0 ? parseFloat(pctChanges[tooltipPctIdx]) : null;
 
   return (
-    <div
-      style={{ width: "100%", height: 36, overflow: "hidden", position: "relative" }}
-      onMouseEnter={() => setTooltip(true)}
-      onMouseLeave={() => setTooltip(false)}
-    >
+    <div style={{ width: "100%", height: 36, overflow: "hidden" }}>
       <svg
         viewBox="0 0 200 36"
         preserveAspectRatio="none"
-        style={{ width: "100%", height: 36, display: "block" }}
+        style={{ width: "100%", height: 36, display: "block", cursor: "crosshair" }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
       >
         <path
           d={pathD}
@@ -93,12 +102,12 @@ export default function StockSparkline({ ticker }: StockSparklineProps) {
           strokeLinejoin="round"
         />
       </svg>
-      {tooltip && tooltipEntries.length > 0 && (
+      {tooltip && (
         <div
           style={{
-            position: "absolute",
-            bottom: 40,
-            right: 0,
+            position: "fixed",
+            left: tooltip.x + 12,
+            top: tooltip.y - 40,
             background: "#161616",
             border: "1px solid #242424",
             padding: "6px 10px",
@@ -106,23 +115,19 @@ export default function StockSparkline({ ticker }: StockSparklineProps) {
             color: "#F0EDE8",
             fontFamily: "JetBrains Mono, monospace",
             whiteSpace: "nowrap",
-            zIndex: 50,
+            zIndex: 9999,
             pointerEvents: "none",
           }}
         >
-          {tooltipEntries.map((entry, i) => (
-            <div
-              key={i}
-              className="flex justify-between gap-4"
-              style={{ color: parseFloat(entry.pct) >= 0 ? "#FF4500" : "#5A5A5A" }}
-            >
-              <span>{entry.date}</span>
-              <span>
-                {parseFloat(entry.pct) >= 0 ? "+" : ""}
-                {entry.pct}%
-              </span>
+          <div>{dates[tooltip.index]}</div>
+          {tooltipPct !== null && (
+            <div style={{ color: tooltipPct >= 0 ? "#FF4500" : "#5A5A5A" }}>
+              {tooltipPct >= 0 ? "+" : ""}{pctChanges[tooltipPctIdx]}%
             </div>
-          ))}
+          )}
+          <div style={{ color: "#5A5A5A" }}>
+            ${prices[tooltip.index].toFixed(2)}
+          </div>
         </div>
       )}
     </div>

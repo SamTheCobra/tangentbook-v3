@@ -18,8 +18,8 @@ def clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
 
 
 def normalize_percentile(current_value: float, historical_values: list[float]) -> float:
-    if not historical_values:
-        return 50.0
+    if not historical_values or len(historical_values) < 3:
+        return 50.0  # Insufficient data for meaningful percentile
     below = sum(1 for v in historical_values if v < current_value)
     return clamp(round((below / len(historical_values)) * 100))
 

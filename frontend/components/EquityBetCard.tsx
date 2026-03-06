@@ -100,14 +100,7 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
         {/* Footer: Feedback + Time horizon */}
         <div className="mt-3 flex items-center gap-3">
           {bet.role === "CANARY" && (
-            <span
-              className="uppercase"
-              style={{
-                color: "var(--accent)",
-                letterSpacing: "0.08em",
-                fontSize: "11px",
-              }}
-            >
+            <span style={{ color: "#FF4500", fontSize: 10, letterSpacing: "0.08em" }}>
               FEEDBACK INDICATOR
             </span>
           )}

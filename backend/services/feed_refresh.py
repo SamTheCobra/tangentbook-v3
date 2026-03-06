@@ -55,17 +55,17 @@ async def refresh_thesis_feeds(thesis_id: str, db: Session):
             feed_weights[feed.id] = feed.weight
 
     # Compute evidence score
+    total_feeds = len(feeds)
     if feed_scores:
         evidence = compute_evidence_score(feed_scores, feed_weights, offline_feeds)
     else:
-        evidence = thesis.evidence_score  # Keep existing
+        evidence = thesis.evidence_score  # Keep existing when all feeds are down
 
     # Momentum: simple comparison to previous evidence
     prev_evidence = thesis.evidence_score
     momentum = _compute_simple_momentum(evidence, prev_evidence)
 
     # Conviction from data quality
-    total_feeds = len(feeds)
     live_feeds = total_feeds - len(offline_feeds)
     freshness = clamp((live_feeds / total_feeds) * 100) if total_feeds > 0 else 50
     signal_values = list(feed_scores.values())
