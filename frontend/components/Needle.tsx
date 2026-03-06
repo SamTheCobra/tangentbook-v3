@@ -16,20 +16,6 @@ const SIZES = {
   lg: { width: 400, height: 240, needleLen: 150, fontSize: 36, strokeWidth: 2.5 },
 };
 
-function getComputedCSSVar(name: string): string {
-  if (typeof window === "undefined") return "";
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
-// Map score to wedge opacity
-function scoreToOpacity(score: number): number {
-  const s = Math.max(0, Math.min(100, score));
-  if (s <= 30) return 0.05 + (s / 30) * 0.10;        // 0.05–0.15
-  if (s <= 60) return 0.15 + ((s - 30) / 30) * 0.15;  // 0.15–0.30
-  if (s <= 80) return 0.30 + ((s - 60) / 20) * 0.20;  // 0.30–0.50
-  return 0.50 + ((s - 80) / 20) * 0.20;                // 0.50–0.70
-}
-
 export default function Needle({ score, size = "md", label = "THI", animated = true, formulaText }: NeedleProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [displayScore, setDisplayScore] = useState(animated ? 0 : score);
@@ -80,98 +66,84 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     canvas.height = cfg.height * dpr;
     ctx.scale(dpr, dpr);
 
-    const muted = getComputedCSSVar("--text-muted") || "#8A8580";
-
     ctx.clearRect(0, 0, cfg.width, cfg.height);
 
     const cx = cfg.width / 2;
     const cy = cfg.height * 0.72;
     const radius = cfg.needleLen + 8;
 
-    const clampedScore = Math.max(0, Math.min(100, displayScore));
-    const needleAngle = Math.PI + (clampedScore / 100) * Math.PI;
+    const s = Math.max(0, Math.min(100, displayScore));
+    const needleAngle = Math.PI + (s / 100) * Math.PI;
+    const nx = cx + radius * Math.cos(needleAngle);
+    const ny = cy + radius * Math.sin(needleAngle);
 
-    // ── 1. Swept wedge fill (drawn first, behind everything) ──
-    if (clampedScore > 0.5) {
-      const wedgeOpacity = scoreToOpacity(clampedScore);
+    // Scale factors per size
+    const lineW = size === "lg" ? 2.5 : size === "md" ? 2 : 1.5;
+    const pivotR = size === "lg" ? 5 : size === "md" ? 4 : 3;
+    const tipR = size === "lg" ? 4 : size === "md" ? 3 : 2.5;
 
-      // Create radial gradient from pivot to arc edge
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-      grad.addColorStop(0, `rgba(232, 68, 10, ${wedgeOpacity})`);
-      grad.addColorStop(1, `rgba(232, 68, 10, ${wedgeOpacity * 0.4})`);
+    const opacity =
+      s < 30 ? 0.10 + (s / 30) * 0.15 :
+      s < 60 ? 0.25 + ((s - 30) / 30) * 0.20 :
+      s < 80 ? 0.45 + ((s - 60) / 20) * 0.15 :
+               0.60 + ((s - 80) / 20) * 0.10;
 
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, radius, Math.PI, needleAngle);
-      ctx.closePath();
-      ctx.fillStyle = grad;
-      ctx.fill();
-    }
-
-    // ── 2. Dark arc background ──
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, Math.PI, Math.PI * 2);
-    ctx.strokeStyle = "#1E1B18";
-    ctx.lineWidth = cfg.strokeWidth + 4;
-    ctx.stroke();
-
-    // ── 3. Arc outline ──
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, Math.PI, Math.PI * 2);
-    ctx.strokeStyle = "#2A2723";
-    ctx.lineWidth = cfg.strokeWidth;
-    ctx.stroke();
-
-    // ── 4. Tick marks ──
-    for (let i = 0; i <= 10; i++) {
-      const angle = Math.PI + (i / 10) * Math.PI;
-      const tickInner = radius - (i % 5 === 0 ? 8 : 4);
-      const tickOuter = radius + 2;
-      ctx.beginPath();
-      ctx.moveTo(cx + tickInner * Math.cos(angle), cy + tickInner * Math.sin(angle));
-      ctx.lineTo(cx + tickOuter * Math.cos(angle), cy + tickOuter * Math.sin(angle));
-      ctx.strokeStyle = i % 5 === 0 ? muted : "#2A2723";
-      ctx.lineWidth = i % 5 === 0 ? 1.5 : 0.75;
-      ctx.stroke();
-    }
-
-    // ── 5. Needle line ──
-    const needleX = cx + cfg.needleLen * Math.cos(needleAngle);
-    const needleY = cy + cfg.needleLen * Math.sin(needleAngle);
-
+    // WEDGE
+    ctx.save();
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.lineTo(needleX, needleY);
+    ctx.arc(cx, cy, radius - 4, Math.PI, needleAngle, false);
+    ctx.closePath();
+    const gx0 = cx - radius;
+    const gx1 = cx + radius;
+    const grad = ctx.createLinearGradient(gx0, 0, gx1, 0);
+    grad.addColorStop(0,    "rgba(232,68,10,0)");
+    grad.addColorStop(0.50, `rgba(232,68,10,${opacity})`);
+    grad.addColorStop(1,    `rgba(232,68,10,${opacity})`);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+
+    // ARC OUTLINE
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI, false);
+    ctx.strokeStyle = "rgba(255,255,255,0.13)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // TICK MARKS at 0, 50, 100
+    [0, 50, 100].forEach(v => {
+      const a = Math.PI + (v / 100) * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(cx + (radius - 8) * Math.cos(a), cy + (radius - 8) * Math.sin(a));
+      ctx.lineTo(cx + (radius + 3) * Math.cos(a), cy + (radius + 3) * Math.sin(a));
+      ctx.strokeStyle = "rgba(255,255,255,0.22)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+
+    // NEEDLE LINE
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(nx, ny);
     ctx.strokeStyle = "#E8440A";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = lineW;
     ctx.lineCap = "round";
     ctx.stroke();
 
-    // ── 6. Needle tip dot ──
+    // PIVOT DOT
     ctx.beginPath();
-    ctx.arc(needleX, needleY, size === "lg" ? 4 : 3, 0, Math.PI * 2);
+    ctx.arc(cx, cy, pivotR, 0, Math.PI * 2);
     ctx.fillStyle = "#E8440A";
     ctx.fill();
 
-    // ── 7. Pivot dot ──
+    // TIP DOT
     ctx.beginPath();
-    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.arc(nx, ny, tipR, 0, Math.PI * 2);
     ctx.fillStyle = "#E8440A";
     ctx.fill();
 
-    // ── 8. REFUTED / CONFIRMED labels ──
-    if (size !== "sm") {
-      const labelFontSize = size === "lg" ? 11 : 9;
-      ctx.font = `${labelFontSize}px Inter, system-ui, sans-serif`;
-      ctx.fillStyle = muted;
-      ctx.textAlign = "left";
-      ctx.letterSpacing = "0.08em";
-      ctx.fillText("REFUTED", cx - radius - 4, cy + (size === "lg" ? 18 : 14));
-      ctx.textAlign = "right";
-      ctx.fillText("CONFIRMED", cx + radius + 4, cy + (size === "lg" ? 18 : 14));
-    }
-
-    // ── 9. Score text ──
+    // SCORE TEXT
     ctx.font = `bold ${cfg.fontSize}px "JetBrains Mono", monospace`;
     ctx.fillStyle = "#E8440A";
     ctx.textAlign = "center";
