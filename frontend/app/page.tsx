@@ -163,7 +163,7 @@ export default function Home() {
 
             <div className="mb-6" style={{ borderTop: "1px solid var(--border)" }} />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
               {filtered.map((thesis) => (
                 <ThesisCard key={thesis.id} thesis={thesis} />
               ))}
@@ -186,28 +186,40 @@ function ThesisCard({ thesis }: { thesis: Thesis }) {
       style={{
         background: "#1A1A1A",
         border: `1px solid ${hovered ? "#E8440A" : "#2A2A2A"}`,
-        padding: "24px",
-        minHeight: "140px",
+        padding: "28px",
+        minHeight: "160px",
         textDecoration: "none",
         transition: "border-color 0.15s ease",
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className="flex items-center gap-4">
-        <h2
-          className="flex-1 font-bold uppercase"
-          style={{
-            color: "#F5F3EE",
-            fontFamily: "Inter, system-ui, sans-serif",
-            fontSize: "18px",
-            letterSpacing: "-0.03em",
-            lineHeight: "1.3",
-          }}
-        >
-          {thesis.title}
-        </h2>
-        <div className="flex-shrink-0">
+      <div className="flex items-center gap-6">
+        <div style={{ flex: "0 0 65%" }}>
+          <h2
+            className="font-bold uppercase"
+            style={{
+              color: "#F5F3EE",
+              fontFamily: "Inter, system-ui, sans-serif",
+              fontSize: "20px",
+              letterSpacing: "-0.03em",
+              lineHeight: "1.3",
+            }}
+          >
+            {thesis.title}
+          </h2>
+          <p
+            className="mt-2"
+            style={{
+              color: "#6B6B6B",
+              fontSize: "14px",
+              lineHeight: "1.5",
+            }}
+          >
+            {thesis.subtitle}
+          </p>
+        </div>
+        <div className="flex-1 flex justify-center">
           <Needle score={thesis.thi.score} size="sm" />
         </div>
       </div>
