@@ -3,45 +3,55 @@
 import { EquityBet } from "@/lib/api";
 import Sparkline from "./Sparkline";
 
+const ALL_ROLES = ["BENEFICIARY", "HEADWIND", "CANARY"] as const;
+
 interface EquityBetCardProps {
   bet: EquityBet;
 }
 
 export default function EquityBetCard({ bet }: EquityBetCardProps) {
-  const roleColor =
-    bet.role === "BENEFICIARY"
-      ? "var(--positive)"
-      : bet.role === "HEADWIND"
-      ? "var(--text-muted)"
-      : "var(--accent)";
-
   const priceHistory = bet.priceHistory?.map((p) => p.close) || [];
   const hasPrice = bet.currentPrice != null;
   const hasPriceChange = bet.priceChange12mPct != null;
 
   return (
     <div
-      className="border p-4"
+      className="border p-5"
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
+      {/* Ticker + Price */}
+      <div className="flex items-start justify-between mb-2">
+        <div>
           <span
-            className="font-bold"
+            className="font-bold block"
             style={{
-              color: "var(--text)",
+              color: "var(--accent)",
               fontFamily: "JetBrains Mono, monospace",
-              fontSize: "16px",
+              fontSize: "20px",
+              letterSpacing: "-0.02em",
             }}
           >
             {bet.ticker}
           </span>
+          <span
+            className="block mt-0.5"
+            style={{
+              color: "var(--text)",
+              fontSize: "14px",
+              lineHeight: "1.3",
+            }}
+          >
+            {bet.companyName}
+          </span>
+        </div>
+        <div className="text-right flex-shrink-0 ml-3">
           {hasPrice && (
             <span
+              className="block"
               style={{
-                color: "var(--text-muted)",
+                color: "var(--text)",
                 fontFamily: "JetBrains Mono, monospace",
-                fontSize: "12px",
+                fontSize: "15px",
               }}
             >
               ${bet.currentPrice!.toFixed(2)}
@@ -49,10 +59,11 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
           )}
           {hasPriceChange && (
             <span
+              className="block"
               style={{
                 color: bet.priceChange12mPct! >= 0 ? "var(--positive)" : "var(--text-muted)",
                 fontFamily: "JetBrains Mono, monospace",
-                fontSize: "12px",
+                fontSize: "13px",
               }}
             >
               {bet.priceChange12mPct! >= 0 ? "+" : ""}
@@ -60,53 +71,73 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
             </span>
           )}
         </div>
-        <span
-          className="text-xs uppercase px-2 py-0.5 border"
-          style={{
-            color: roleColor,
-            borderColor: roleColor,
-            letterSpacing: "0.08em",
-            fontSize: "9px",
-          }}
-        >
-          {bet.role}
-        </span>
       </div>
 
+      {/* Sparkline */}
       {priceHistory.length > 1 && (
-        <div className="mb-2">
+        <div className="mb-3">
           <Sparkline
             data={priceHistory}
-            color={roleColor}
+            color="var(--accent)"
             width={200}
             height={32}
           />
         </div>
       )}
 
-      <p className="text-xs" style={{ color: "var(--text-muted)", lineHeight: "1.4" }}>
+      {/* Rationale */}
+      <p style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
         {bet.rationale}
       </p>
 
+      {/* Role badges — all shown, active highlighted */}
+      <div className="mt-3 flex items-center gap-2">
+        {ALL_ROLES.map((role) => {
+          const isActive = bet.role === role;
+          const activeColor =
+            role === "BENEFICIARY"
+              ? "var(--positive)"
+              : role === "HEADWIND"
+              ? "var(--accent)"
+              : "var(--accent-soft)";
+          return (
+            <span
+              key={role}
+              className="uppercase px-2 py-0.5 border"
+              style={{
+                color: isActive ? activeColor : "var(--border)",
+                borderColor: isActive ? activeColor : "var(--border)",
+                letterSpacing: "0.08em",
+                fontSize: "11px",
+                opacity: isActive ? 1 : 0.4,
+              }}
+            >
+              {role}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Feedback + Time */}
       <div className="mt-2 flex items-center gap-3">
         {bet.isFeedbackIndicator && (
           <span
-            className="text-xs uppercase"
+            className="uppercase"
             style={{
               color: "var(--accent)",
               letterSpacing: "0.08em",
-              fontSize: "9px",
+              fontSize: "11px",
             }}
           >
             FEEDBACK INDICATOR
           </span>
         )}
         <span
-          className="text-xs uppercase"
+          className="uppercase"
           style={{
             color: "var(--text-muted)",
             letterSpacing: "0.08em",
-            fontSize: "9px",
+            fontSize: "11px",
           }}
         >
           {bet.timeHorizon}

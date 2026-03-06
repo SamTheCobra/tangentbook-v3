@@ -85,11 +85,6 @@ export default function Home() {
     setTheses((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const handleConviction = async (id: string, score: number, note?: string) => {
-    const updated = await api.updateConviction(id, score, note);
-    setTheses((prev) => prev.map((t) => (t.id === id ? updated : t)));
-  };
-
   return (
     <ErrorBoundary>
     <main className="min-h-screen" style={{ background: "var(--bg)" }}>
@@ -117,14 +112,15 @@ export default function Home() {
                     <button
                       key={tab}
                       onClick={() => setFilter(tab)}
-                      className="text-xs uppercase pb-1"
+                      className="uppercase pb-1"
                       style={{
                         color: filter === tab ? "var(--text)" : "var(--text-muted)",
                         letterSpacing: "0.08em",
                         background: "none",
                         border: "none",
-                        borderBottom: `1px solid ${filter === tab ? "var(--text)" : "transparent"}`,
+                        borderBottom: `1px solid ${filter === tab ? "var(--accent)" : "transparent"}`,
                         cursor: "pointer",
+                        fontSize: "13px",
                       }}
                     >
                       {tab}
@@ -135,14 +131,14 @@ export default function Home() {
                     <button
                       key={tag}
                       onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
-                      className="text-xs uppercase"
+                      className="uppercase"
                       style={{
                         color: tagFilter === tag ? "var(--accent)" : "var(--text-muted)",
                         letterSpacing: "0.08em",
                         background: "none",
                         border: "none",
                         cursor: "pointer",
-                        fontSize: "10px",
+                        fontSize: "12px",
                       }}
                     >
                       {tag}
@@ -151,7 +147,7 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-xs uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}>
+                  <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
                     SORT
                   </span>
                   {[
@@ -163,14 +159,14 @@ export default function Home() {
                     <button
                       key={s.key}
                       onClick={() => setSort(s.key)}
-                      className="text-xs uppercase"
+                      className="uppercase"
                       style={{
                         color: sort === s.key ? "var(--text)" : "var(--text-muted)",
                         letterSpacing: "0.08em",
                         background: "none",
                         border: "none",
                         cursor: "pointer",
-                        fontSize: "10px",
+                        fontSize: "12px",
                         textDecoration: sort === s.key ? "underline" : "none",
                         textUnderlineOffset: "3px",
                       }}
@@ -181,7 +177,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <span style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>
+              <span style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "14px" }}>
                 {filtered.length} theses
               </span>
             </div>
@@ -196,7 +192,6 @@ export default function Home() {
                   onCollapse={() => handleCollapse(thesis.id)}
                   onArchive={() => handleArchive(thesis.id)}
                   onDelete={() => handleDelete(thesis.id, thesis.title)}
-                  onConviction={(score, note) => handleConviction(thesis.id, score, note)}
                 />
               ))}
             </div>
@@ -213,13 +208,11 @@ function ThesisCard({
   onCollapse,
   onArchive,
   onDelete,
-  onConviction,
 }: {
   thesis: Thesis;
   onCollapse: () => void;
   onArchive: () => void;
   onDelete: () => void;
-  onConviction: (score: number, note?: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -232,20 +225,19 @@ function ThesisCard({
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <Link
             href={`/thesis/${thesis.id}`}
-            className="font-bold uppercase text-xs truncate hover:underline"
-            style={{ color: "var(--text)", letterSpacing: "-0.03em", textUnderlineOffset: "3px" }}
+            className="font-bold uppercase hover:underline"
+            style={{ color: "var(--text)", letterSpacing: "-0.03em", textUnderlineOffset: "3px", fontSize: "14px" }}
           >
             {thesis.title}
           </Link>
         </div>
         <div className="flex items-center gap-4 ml-4">
-          <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+          <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
             {Math.round(thesis.thi.score)}
           </span>
           <button
             onClick={onCollapse}
-            className="text-xs"
-            style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+            style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
           >
             +
           </button>
@@ -264,24 +256,24 @@ function ThesisCard({
           <div className="flex items-start justify-between">
             <Link
               href={`/thesis/${thesis.id}`}
-              className="font-bold uppercase text-sm hover:underline"
-              style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", textUnderlineOffset: "3px" }}
+              className="font-bold uppercase hover:underline"
+              style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", textUnderlineOffset: "3px", fontSize: "15px" }}
             >
               {thesis.title}
             </Link>
             <div className="flex items-center gap-1 ml-2 flex-shrink-0">
               <button
                 onClick={onCollapse}
-                className="text-xs px-1"
-                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+                className="px-1"
+                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
               >
                 —
               </button>
               <div className="relative">
                 <button
                   onClick={() => setMenuOpen(!menuOpen)}
-                  className="text-xs px-1"
-                  style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+                  className="px-1"
+                  style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
                 >
                   ...
                 </button>
@@ -292,15 +284,15 @@ function ThesisCard({
                   >
                     <button
                       onClick={() => { onArchive(); setMenuOpen(false); }}
-                      className="block w-full text-left px-3 py-1.5 text-xs uppercase"
-                      style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", letterSpacing: "0.08em" }}
+                      className="block w-full text-left px-3 py-1.5 uppercase"
+                      style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", letterSpacing: "0.08em", fontSize: "12px" }}
                     >
                       {thesis.isArchived ? "Unarchive" : "Archive thesis"}
                     </button>
                     <button
                       onClick={() => { onDelete(); setMenuOpen(false); }}
-                      className="block w-full text-left px-3 py-1.5 text-xs uppercase"
-                      style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", letterSpacing: "0.08em" }}
+                      className="block w-full text-left px-3 py-1.5 uppercase"
+                      style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", letterSpacing: "0.08em", fontSize: "12px" }}
                     >
                       Delete thesis
                     </button>
@@ -309,7 +301,7 @@ function ThesisCard({
               </div>
             </div>
           </div>
-          <p className="mt-1 text-xs" style={{ color: "var(--text-muted)", lineHeight: "1.4" }}>
+          <p className="mt-2" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
             {thesis.subtitle}
           </p>
         </div>
@@ -319,26 +311,10 @@ function ThesisCard({
       <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-xs uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}>
+            <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
               CONVICTION
             </span>
-            <input
-              type="range"
-              min={1}
-              max={10}
-              value={thesis.userConviction.score}
-              onChange={() => {}}
-              onMouseUp={(e) => {
-                const val = parseInt((e.target as HTMLInputElement).value);
-                if (val !== thesis.userConviction.score) onConviction(val);
-              }}
-              onInput={(e) => {
-                // Visual only during drag
-                (e.target as HTMLInputElement).title = (e.target as HTMLInputElement).value;
-              }}
-              style={{ accentColor: "var(--accent)", width: "60px", height: "2px" }}
-            />
-            <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
               {thesis.userConviction.score}/10
             </span>
           </div>
@@ -346,17 +322,16 @@ function ThesisCard({
             {thesis.equityBets.slice(0, 3).map((bet) => (
               <span
                 key={bet.id}
-                className="text-xs"
                 style={{
                   color: bet.role === "BENEFICIARY" ? "var(--positive)" : bet.role === "HEADWIND" ? "var(--text-muted)" : "var(--accent)",
                   fontFamily: "JetBrains Mono, monospace",
-                  fontSize: "11px",
+                  fontSize: "13px",
                 }}
               >
                 {bet.ticker}
               </span>
             ))}
-            <span className="text-xs uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}>
+            <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
               {thesis.timeHorizon}
             </span>
           </div>
@@ -364,8 +339,8 @@ function ThesisCard({
 
         {thesis.userConviction.divergenceWarning && (
           <div
-            className="mt-2 px-2 py-1 border text-xs"
-            style={{ borderColor: "var(--accent)", color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "10px" }}
+            className="mt-2 px-2 py-1 border"
+            style={{ borderColor: "var(--accent)", color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}
           >
             {thesis.userConviction.divergenceWarning}
           </div>
@@ -377,8 +352,8 @@ function ThesisCard({
           {thesis.tags.map((tag) => (
             <span
               key={tag}
-              className="text-xs uppercase px-2 py-0.5 border"
-              style={{ color: "var(--text-muted)", borderColor: "var(--border)", letterSpacing: "0.08em", fontSize: "9px" }}
+              className="uppercase px-2 py-0.5 border"
+              style={{ color: "var(--text-muted)", borderColor: "var(--border)", letterSpacing: "0.08em", fontSize: "11px" }}
             >
               {tag}
             </span>

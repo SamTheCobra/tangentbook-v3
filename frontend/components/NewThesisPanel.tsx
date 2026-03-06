@@ -94,7 +94,7 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border text-sm"
+                className="w-full px-3 py-2 border text-base"
                 style={{
                   background: "var(--bg)",
                   borderColor: "var(--border)",
@@ -110,7 +110,7 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
                 value={subtitle}
                 onChange={(e) => setSubtitle(e.target.value)}
                 placeholder="The core claim in one sentence"
-                className="w-full px-3 py-2 border text-sm"
+                className="w-full px-3 py-2 border text-base"
                 style={{
                   background: "var(--bg)",
                   borderColor: "var(--border)",
@@ -125,7 +125,7 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={5}
-                className="w-full px-3 py-2 border text-sm resize-none"
+                className="w-full px-3 py-2 border text-base resize-none"
                 style={{
                   background: "var(--bg)",
                   borderColor: "var(--border)",
@@ -139,7 +139,7 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
               <select
                 value={timeHorizon}
                 onChange={(e) => setTimeHorizon(e.target.value)}
-                className="w-full px-3 py-2 border text-sm"
+                className="w-full px-3 py-2 border text-base"
                 style={{
                   background: "var(--bg)",
                   borderColor: "var(--border)",
@@ -161,7 +161,7 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
                 placeholder="macro, AI, consumer (comma-separated)"
-                className="w-full px-3 py-2 border text-sm"
+                className="w-full px-3 py-2 border text-base"
                 style={{
                   background: "var(--bg)",
                   borderColor: "var(--border)",
@@ -197,7 +197,7 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
             <button
               onClick={handleSubmit}
               disabled={saving || !title || !subtitle || !description}
-              className="w-full py-2 text-sm uppercase border"
+              className="w-full py-2 text-base uppercase border"
               style={{
                 background: !title || !subtitle || !description ? "transparent" : "var(--text)",
                 color: !title || !subtitle || !description ? "var(--text-muted)" : "var(--bg)",
@@ -220,8 +220,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return (
     <div>
       <label
-        className="text-xs uppercase block mb-1"
-        style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
+        className="uppercase block mb-1"
+        style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
       >
         {label}
       </label>

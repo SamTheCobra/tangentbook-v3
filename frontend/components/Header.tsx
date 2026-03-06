@@ -27,7 +27,7 @@ export default function Header({ onNewThesis }: HeaderProps) {
       <div className="flex items-center gap-8">
         <Link
           href="/"
-          className="font-bold text-lg uppercase"
+          className="font-bold text-xl uppercase"
           style={{
             color: "var(--text)",
             letterSpacing: "-0.04em",
@@ -66,7 +66,7 @@ export default function Header({ onNewThesis }: HeaderProps) {
         {onNewThesis && (
           <button
             onClick={onNewThesis}
-            className="text-xs uppercase px-3 py-1.5 border"
+            className="uppercase px-3 py-1.5 border"
             style={{
               color: "var(--text)",
               borderColor: "var(--text)",
@@ -74,6 +74,7 @@ export default function Header({ onNewThesis }: HeaderProps) {
               background: "none",
               cursor: "pointer",
               fontFamily: "Inter, system-ui, sans-serif",
+              fontSize: "13px",
             }}
           >
             + NEW THESIS
@@ -89,11 +90,11 @@ function MacroItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center gap-2">
       <span
-        className="text-xs uppercase"
+        className="uppercase"
         style={{
           color: "var(--text-muted)",
           letterSpacing: "0.08em",
-          fontSize: "11px",
+          fontSize: "13px",
           fontFamily: "Inter, system-ui, sans-serif",
         }}
       >
@@ -101,9 +102,9 @@ function MacroItem({ label, value }: { label: string; value: string }) {
       </span>
       <span
         style={{
-          color: isPlaceholder ? "var(--text-muted)" : "var(--text)",
+          color: isPlaceholder ? "var(--text-muted)" : "var(--accent)",
           fontFamily: "JetBrains Mono, monospace",
-          fontSize: "13px",
+          fontSize: "15px",
         }}
       >
         {value}

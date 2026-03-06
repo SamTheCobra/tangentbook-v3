@@ -15,7 +15,7 @@ export default function Skeleton({ width = "100%", lines = 1 }: SkeletonProps) {
           style={{
             color: "var(--text-muted)",
             fontFamily: "JetBrains Mono, monospace",
-            fontSize: "14px",
+            fontSize: "16px",
           }}
         >
           ————
@@ -33,17 +33,17 @@ export function ThesisCardSkeleton() {
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 mr-4">
-          <div style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>
+          <div style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "14px" }}>
             ————————
           </div>
-          <div className="mt-2" style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "11px" }}>
+          <div className="mt-2" style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
             ——————————————
           </div>
         </div>
         <div style={{ width: 120, height: 72, background: "var(--surface-alt)" }} />
       </div>
       <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
-        <div style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "11px" }}>
+        <div style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
           ————
         </div>
       </div>

@@ -215,7 +215,43 @@ SEED_DATA = [
             {"name": "SkillBridge", "oneLiner": "Employer-sponsored reskilling platform where companies pay to retrain displaced workers.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"},
             {"name": "CareerVault", "oneLiner": "Portable skills credential wallet that travels with you across employers and industries.", "timing": "TOO_EARLY", "timeHorizon": "3-7yr"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_reskill_credential_inflation",
+                "order": 2,
+                "title": "Credential Inflation Kills the Degree Premium",
+                "description": "When everyone has micro-credentials and bootcamp certs, traditional 4-year degrees lose their signaling value. Universities face enrollment crises.",
+                "initialTHI": 58,
+                "equityBets": [
+                    {"ticker": "LOPE", "role": "HEADWIND", "rationale": "Grand Canyon Education faces enrollment pressure as alternatives proliferate"},
+                    {"ticker": "COUR", "role": "BENEFICIARY", "rationale": "Coursera captures demand for stackable, employer-recognized credentials"},
+                    {"ticker": "LRN", "role": "BENEFICIARY", "rationale": "Stride Inc benefits as K-12 families embrace alternative education pathways"}
+                ]
+            },
+            {
+                "id": "effect_reskill_staffing_boom",
+                "order": 2,
+                "title": "Staffing Agencies Become Talent Brokers",
+                "description": "As careers fragment into chapters, staffing and talent marketplace companies become the new career infrastructure — matching reskilled workers to short-tenure roles.",
+                "initialTHI": 62,
+                "equityBets": [
+                    {"ticker": "RHI", "role": "BENEFICIARY", "rationale": "Robert Half benefits from a world of constant job transitions"},
+                    {"ticker": "UPWK", "role": "BENEFICIARY", "rationale": "Upwork captures freelance demand from career-chapter workers"},
+                    {"ticker": "HUBS", "role": "CANARY", "rationale": "HubSpot hiring trends signal whether mid-market companies embrace non-traditional talent"}
+                ]
+            },
+            {
+                "id": "effect_reskill_mental_health_surge",
+                "order": 2,
+                "title": "Career Anxiety Fuels Mental Health Demand",
+                "description": "Constant reinvention and job insecurity drive a massive spike in anxiety and demand for mental health services, especially among 30-50 year olds.",
+                "initialTHI": 55,
+                "equityBets": [
+                    {"ticker": "TDOC", "role": "BENEFICIARY", "rationale": "Teladoc's BetterHelp captures therapy demand from career-stressed workers"},
+                    {"ticker": "HIMS", "role": "BENEFICIARY", "rationale": "Hims & Hers expands into anxiety and mental wellness prescriptions"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_electricity_bottleneck",
@@ -243,7 +279,32 @@ SEED_DATA = [
             {"name": "PermitFast", "oneLiner": "Automates the transmission line permitting process — currently takes 7-10 years manually.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"},
             {"name": "MicroGridCo", "oneLiner": "On-site microgrid infrastructure for datacenters that can't wait for utility connections.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_electricity_nuclear_renaissance",
+                "order": 2,
+                "title": "Nuclear Power Gets a Second Life",
+                "description": "Grid bottlenecks make nuclear the only viable option for baseload power at datacenter scale. Shuttered plants get reopened and SMR projects accelerate.",
+                "initialTHI": 65,
+                "equityBets": [
+                    {"ticker": "CEG", "role": "BENEFICIARY", "rationale": "Constellation Energy owns the largest US nuclear fleet — direct beneficiary of reopenings"},
+                    {"ticker": "CCJ", "role": "BENEFICIARY", "rationale": "Cameco uranium supply becomes critical as nuclear demand surges"},
+                    {"ticker": "SMR", "role": "CANARY", "rationale": "NuScale Power's SMR order book signals whether next-gen nuclear is real"}
+                ]
+            },
+            {
+                "id": "effect_electricity_industrial_reshoring_stall",
+                "order": 2,
+                "title": "Reshoring Stalls on Power Constraints",
+                "description": "Factories trying to reshore to the US discover there's no electricity available. Manufacturing buildout gets delayed by 3-5 years while utilities catch up.",
+                "initialTHI": 52,
+                "equityBets": [
+                    {"ticker": "EATON", "role": "BENEFICIARY", "rationale": "Eaton's electrical equipment is essential for every grid upgrade and factory connection"},
+                    {"ticker": "GE", "role": "BENEFICIARY", "rationale": "GE Vernova turbines and grid equipment needed for capacity buildout"},
+                    {"ticker": "X", "role": "HEADWIND", "rationale": "US Steel reshoring demand gets delayed when factories can't get power hookups"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_ai_slop_human_premium",
@@ -271,7 +332,43 @@ SEED_DATA = [
             {"name": "HumanLayer", "oneLiner": "Verified human-only content platform — no AI generated posts allowed.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"},
             {"name": "RealInk", "oneLiner": "Premium newsletter platform that verifies all content is human-written.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_slop_live_events_premium",
+                "order": 2,
+                "title": "Live Events Become the Only Trustworthy Content",
+                "description": "When all recorded media is suspect, live and in-person experiences become the only content you can trust. Concert, sports, and conference tickets skyrocket.",
+                "initialTHI": 60,
+                "equityBets": [
+                    {"ticker": "LYV", "role": "BENEFICIARY", "rationale": "Live Nation controls live event infrastructure — irreplaceable in an AI-slop world"},
+                    {"ticker": "MSGS", "role": "BENEFICIARY", "rationale": "Madison Square Garden Sports owns scarce live venue inventory"},
+                    {"ticker": "DKNG", "role": "CANARY", "rationale": "DraftKings live sports engagement signals whether fans are fleeing digital for live"}
+                ]
+            },
+            {
+                "id": "effect_slop_artisan_ecommerce",
+                "order": 2,
+                "title": "Etsy-fication of Everything",
+                "description": "Human-made provenance becomes a premium label across all consumer categories. Handcrafted goods command 3-5x markups over AI-designed alternatives.",
+                "initialTHI": 55,
+                "equityBets": [
+                    {"ticker": "ETSY", "role": "BENEFICIARY", "rationale": "Etsy is the canonical marketplace for human-made goods — direct beneficiary"},
+                    {"ticker": "AMZN", "role": "HEADWIND", "rationale": "Amazon marketplace drowns in AI-generated product listings, eroding trust"}
+                ]
+            },
+            {
+                "id": "effect_slop_education_crisis",
+                "order": 2,
+                "title": "Education System Can't Grade Anything",
+                "description": "AI-generated essays and homework become undetectable, forcing schools to abandon written assessments entirely and shift to oral exams and in-person demonstrations.",
+                "initialTHI": 68,
+                "equityBets": [
+                    {"ticker": "PRCT", "role": "BENEFICIARY", "rationale": "Procept — proctoring and assessment tools become mission-critical for schools"},
+                    {"ticker": "CHGG", "role": "HEADWIND", "rationale": "Chegg's homework help model collapses when AI does all homework for free"},
+                    {"ticker": "TWOU", "role": "HEADWIND", "rationale": "2U online education faces credibility crisis if degrees can be AI-gamed"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_senior_living_boom",
@@ -300,7 +397,32 @@ SEED_DATA = [
             {"name": "VillageStack", "oneLiner": "Software OS for independent senior living communities.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"},
             {"name": "CareCredits", "oneLiner": "Reverse mortgage alternative that converts home equity into senior care payments.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_senior_caregiver_shortage",
+                "order": 2,
+                "title": "Caregiver Wage Explosion",
+                "description": "Demand for home health aides and nursing staff far outstrips supply, driving wages up 40-60% and creating a labor crisis that forces automation and immigration reform.",
+                "initialTHI": 72,
+                "equityBets": [
+                    {"ticker": "AMED", "role": "BENEFICIARY", "rationale": "Amedisys home health services capture surging demand for in-home elder care"},
+                    {"ticker": "ENSG", "role": "BENEFICIARY", "rationale": "Ensign Group skilled nursing facilities benefit from demographic inevitability"},
+                    {"ticker": "ISRG", "role": "CANARY", "rationale": "Intuitive Surgical robot-assisted procedures signal whether automation fills the care gap"}
+                ]
+            },
+            {
+                "id": "effect_senior_wealth_transfer",
+                "order": 2,
+                "title": "The $80T Wealth Transfer Reshapes Finance",
+                "description": "Boomers passing wealth to Gen X and Millennials triggers the largest intergenerational asset transfer in history, flooding wealth management and estate planning with demand.",
+                "initialTHI": 70,
+                "equityBets": [
+                    {"ticker": "SCHW", "role": "BENEFICIARY", "rationale": "Schwab captures inherited assets flowing into brokerage accounts"},
+                    {"ticker": "RJF", "role": "BENEFICIARY", "rationale": "Raymond James advisors positioned for high-net-worth estate planning"},
+                    {"ticker": "COIN", "role": "CANARY", "rationale": "Coinbase signals whether younger heirs allocate inherited wealth into crypto"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_genz_micro_luxury",
@@ -327,7 +449,32 @@ SEED_DATA = [
             {"name": "StatusStack", "oneLiner": "App that tracks and gamifies your micro-luxury collection.", "timing": "TOO_EARLY", "timeHorizon": "1-3yr"},
             {"name": "DupeLab", "oneLiner": "AI that finds the highest-quality affordable version of any luxury product.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_microlux_legacy_brands_die",
+                "order": 2,
+                "title": "Legacy Luxury Brands Lose Gen Z Forever",
+                "description": "Traditional luxury houses like Gucci and Burberry can't reach Gen Z who'd rather buy 50 small dopamine hits than one big flex. Entry-level luxury gets gutted.",
+                "initialTHI": 58,
+                "equityBets": [
+                    {"ticker": "CPRI", "role": "HEADWIND", "rationale": "Capri Holdings (Versace, Michael Kors) stuck in mid-luxury no-man's-land"},
+                    {"ticker": "TPR", "role": "HEADWIND", "rationale": "Tapestry (Coach, Kate Spade) faces pressure as Gen Z redefines affordable luxury"},
+                    {"ticker": "ELF", "role": "BENEFICIARY", "rationale": "e.l.f. Beauty is the poster child — $8 lip gloss beats $40 Dior"}
+                ]
+            },
+            {
+                "id": "effect_microlux_subscription_fatigue",
+                "order": 2,
+                "title": "Micro-Luxury Subscription Fatigue Hits",
+                "description": "Gen Z signs up for dozens of small subscriptions chasing micro-luxuries, then gets crushed by the aggregate cost. Subscription management and cancellation tools boom.",
+                "initialTHI": 48,
+                "equityBets": [
+                    {"ticker": "AAPL", "role": "CANARY", "rationale": "Apple's App Store subscription revenue signals whether micro-subscription spend is peaking"},
+                    {"ticker": "BMBL", "role": "HEADWIND", "rationale": "Bumble premium subscriptions get cut when Gen Z trims micro-luxury spending"},
+                    {"ticker": "SOFI", "role": "BENEFICIARY", "rationale": "SoFi's budgeting tools capture demand from Gen Z trying to manage subscription sprawl"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_sleep_status",
@@ -354,7 +501,43 @@ SEED_DATA = [
             {"name": "DreamOS", "oneLiner": "Smart bedroom hub that integrates mattress, lighting, temperature, and sound.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"},
             {"name": "RecoveryStack", "oneLiner": "B2B sleep and recovery program sold to employers as a productivity benefit.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_sleep_caffeine_decline",
+                "order": 2,
+                "title": "Caffeine Becomes the New Cigarette",
+                "description": "Sleep-obsessed culture reframes coffee and energy drinks as performance-destroying substances. Decaf and adaptogen beverages surge while caffeine gets vilified.",
+                "initialTHI": 42,
+                "equityBets": [
+                    {"ticker": "MNST", "role": "HEADWIND", "rationale": "Monster Beverage faces headwinds as sleep culture demonizes energy drinks"},
+                    {"ticker": "CELH", "role": "HEADWIND", "rationale": "Celsius energy drink growth stalls if caffeine becomes stigmatized"},
+                    {"ticker": "SBUX", "role": "CANARY", "rationale": "Starbucks decaf and non-coffee menu mix signals the cultural shift"}
+                ]
+            },
+            {
+                "id": "effect_sleep_employer_mandates",
+                "order": 2,
+                "title": "Employers Start Mandating Rest",
+                "description": "Companies discover that well-rested employees are 30% more productive. Sleep tracking becomes an employee benefit, and always-on culture gets regulated.",
+                "initialTHI": 45,
+                "equityBets": [
+                    {"ticker": "AAPL", "role": "BENEFICIARY", "rationale": "Apple Watch sleep data becomes the backbone of corporate wellness programs"},
+                    {"ticker": "CRM", "role": "CANARY", "rationale": "Salesforce-style hustle culture companies adopting sleep policies signals the tipping point"},
+                    {"ticker": "WDAY", "role": "BENEFICIARY", "rationale": "Workday integrates wellness and rest metrics into HR platforms"}
+                ]
+            },
+            {
+                "id": "effect_sleep_bedroom_real_estate",
+                "order": 2,
+                "title": "The Master Bedroom Becomes a $50K Room",
+                "description": "Soundproofing, blackout systems, climate control, and air filtration turn bedrooms into sleep laboratories. Home renovation spending shifts dramatically.",
+                "initialTHI": 50,
+                "equityBets": [
+                    {"ticker": "HD", "role": "BENEFICIARY", "rationale": "Home Depot captures DIY and pro bedroom renovation spend"},
+                    {"ticker": "CARR", "role": "BENEFICIARY", "rationale": "Carrier HVAC and air quality systems become bedroom essentials"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_yield_curve_resteepening",
@@ -382,7 +565,32 @@ SEED_DATA = [
             {"name": "BankYield", "oneLiner": "Platform that helps community banks optimize their loan books for steepening rates.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"},
             {"name": "SteepAlpha", "oneLiner": "Yield curve trade signal service for retail investors.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_yield_cre_refinancing_crisis",
+                "order": 2,
+                "title": "Commercial Real Estate Refinancing Wave Hits",
+                "description": "Rising long rates make CRE refinancing punitive. Office buildings with 2021 low-rate debt face 200-400bps higher refinancing costs, triggering defaults.",
+                "initialTHI": 63,
+                "equityBets": [
+                    {"ticker": "VNO", "role": "HEADWIND", "rationale": "Vornado's office-heavy portfolio faces refinancing pressure from steeper curves"},
+                    {"ticker": "STWD", "role": "CANARY", "rationale": "Starwood Property Trust's CRE loan book signals where defaults are emerging"},
+                    {"ticker": "CBRE", "role": "BENEFICIARY", "rationale": "CBRE captures advisory fees from distressed CRE workouts and restructurings"}
+                ]
+            },
+            {
+                "id": "effect_yield_community_bank_revival",
+                "order": 2,
+                "title": "Community Banks Make a Comeback",
+                "description": "Steeper curves restore the traditional borrow-short-lend-long business model. Small banks that survived the inversion suddenly have thriving margins again.",
+                "initialTHI": 58,
+                "equityBets": [
+                    {"ticker": "KRE", "role": "BENEFICIARY", "rationale": "Regional bank ETF is the purest play on steepening-driven NIM expansion"},
+                    {"ticker": "EWBC", "role": "BENEFICIARY", "rationale": "East West Bancorp benefits from restored lending margins in growth markets"},
+                    {"ticker": "NYCB", "role": "CANARY", "rationale": "New York Community Bank's recovery signals whether steepening can heal damaged banks"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_anti_addiction",
@@ -410,7 +618,43 @@ SEED_DATA = [
             {"name": "FocusOS", "oneLiner": "Employer productivity platform that replaces notification overload with intentional work windows.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"},
             {"name": "OfflineClub", "oneLiner": "Physical community spaces designed for analog connection — no phones, no screens.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_antiaddiction_regulation_wave",
+                "order": 2,
+                "title": "Social Media Gets Regulated Like Tobacco",
+                "description": "Surgeon General warnings, age restrictions, and usage caps get mandated for social platforms. Compliance costs crater margins for engagement-maximizing companies.",
+                "initialTHI": 52,
+                "equityBets": [
+                    {"ticker": "SNAP", "role": "HEADWIND", "rationale": "Snapchat is most exposed to youth-focused social media regulation"},
+                    {"ticker": "META", "role": "HEADWIND", "rationale": "Meta's Instagram faces the strongest regulatory pressure from concerned parents"},
+                    {"ticker": "MGNI", "role": "CANARY", "rationale": "Magnite ad exchange volumes signal whether regulated platforms lose advertiser interest"}
+                ]
+            },
+            {
+                "id": "effect_antiaddiction_dumbphone_boom",
+                "order": 2,
+                "title": "Dumbphones Become a Status Symbol",
+                "description": "Wealthy, high-status people publicly switch to feature phones as a flex. The anti-smartphone movement goes from niche to aspirational.",
+                "initialTHI": 44,
+                "equityBets": [
+                    {"ticker": "NOK", "role": "BENEFICIARY", "rationale": "Nokia feature phones see unexpected demand from anti-smartphone movement"},
+                    {"ticker": "AAPL", "role": "CANARY", "rationale": "Apple iPhone upgrade cycle lengthening signals growing anti-smartphone sentiment"},
+                    {"ticker": "GRMN", "role": "BENEFICIARY", "rationale": "Garmin watches replace phones for fitness and navigation among digital minimalists"}
+                ]
+            },
+            {
+                "id": "effect_antiaddiction_attention_premium",
+                "order": 2,
+                "title": "Deep Focus Becomes a Paid Service",
+                "description": "The ability to concentrate for hours becomes so rare that companies pay premium prices for deep-focus workers. Attention training becomes a professional skill.",
+                "initialTHI": 47,
+                "equityBets": [
+                    {"ticker": "CALM", "role": "BENEFICIARY", "rationale": "Calm meditation app captures demand for focus and attention training"},
+                    {"ticker": "DUOL", "role": "BENEFICIARY", "rationale": "Duolingo's gamified focus model proves attention can be retrained"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_analogue_revival",
@@ -439,7 +683,32 @@ SEED_DATA = [
             {"name": "TableSet", "oneLiner": "Board game bar franchise model — monthly membership, curated game library, no phones.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"},
             {"name": "PenPalPro", "oneLiner": "Handwritten letter subscription — you type it, they print it beautifully and mail it.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_analogue_paper_shortage",
+                "order": 2,
+                "title": "Paper and Film Supply Can't Keep Up",
+                "description": "Kodak film, Moleskine notebooks, and vinyl pressing plants were scaled down for decades. Sudden demand spikes create supply shortages and price premiums.",
+                "initialTHI": 57,
+                "equityBets": [
+                    {"ticker": "KODK", "role": "BENEFICIARY", "rationale": "Kodak film production can't meet surging demand from analog photography revival"},
+                    {"ticker": "IP", "role": "BENEFICIARY", "rationale": "International Paper benefits from increased demand for premium paper products"},
+                    {"ticker": "WMG", "role": "CANARY", "rationale": "Warner Music vinyl sales data signals the depth of the analog audio comeback"}
+                ]
+            },
+            {
+                "id": "effect_analogue_third_places",
+                "order": 2,
+                "title": "Third Places Make a Physical Comeback",
+                "description": "Bookstores, record shops, and game cafes become the new social infrastructure as people seek screen-free gathering spaces. Physical retail gets a surprising second act.",
+                "initialTHI": 60,
+                "equityBets": [
+                    {"ticker": "HAS", "role": "BENEFICIARY", "rationale": "Hasbro board game and tabletop division benefits from analog social gatherings"},
+                    {"ticker": "BNED", "role": "BENEFICIARY", "rationale": "Barnes & Noble Education's physical bookstore model finds new cultural relevance"},
+                    {"ticker": "SBUX", "role": "CANARY", "rationale": "Starbucks dwell time trends signal whether physical third places are reviving"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_verification_crisis",
@@ -467,7 +736,43 @@ SEED_DATA = [
             {"name": "VerifyLayer", "oneLiner": "Browser plugin that checks authenticity scores on any content you encounter.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"},
             {"name": "TrustChain", "oneLiner": "Enterprise content provenance platform for media companies.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_verification_identity_layer",
+                "order": 2,
+                "title": "Digital Identity Becomes Mandatory Infrastructure",
+                "description": "Governments and platforms mandate verified human identity for posting content. Anonymous internet dies, replaced by identity-first platforms.",
+                "initialTHI": 56,
+                "equityBets": [
+                    {"ticker": "OKTA", "role": "BENEFICIARY", "rationale": "Okta identity verification becomes the backbone of authenticated content platforms"},
+                    {"ticker": "TWLO", "role": "BENEFICIARY", "rationale": "Twilio Verify handles phone-based identity confirmation at scale"},
+                    {"ticker": "RDDT", "role": "HEADWIND", "rationale": "Reddit's anonymous culture faces existential pressure from identity mandates"}
+                ]
+            },
+            {
+                "id": "effect_verification_insurance_chaos",
+                "order": 2,
+                "title": "Insurance Claims Become Unverifiable",
+                "description": "AI-generated photos and videos of fake damage make insurance fraud trivial. Carriers scramble for new verification tools, and premiums spike for everyone.",
+                "initialTHI": 62,
+                "equityBets": [
+                    {"ticker": "LMND", "role": "HEADWIND", "rationale": "Lemonade's AI claims processing is vulnerable to AI-generated fraudulent evidence"},
+                    {"ticker": "VRSK", "role": "BENEFICIARY", "rationale": "Verisk's data analytics becomes critical for detecting AI-generated insurance fraud"},
+                    {"ticker": "ALL", "role": "CANARY", "rationale": "Allstate's claims expense ratio signals whether AI fraud is materially impacting carriers"}
+                ]
+            },
+            {
+                "id": "effect_verification_legal_evidence_crisis",
+                "order": 2,
+                "title": "Courts Can't Trust Digital Evidence",
+                "description": "Photos, videos, and audio recordings become inadmissible without cryptographic provenance chains. The legal system scrambles to adapt evidentiary standards.",
+                "initialTHI": 49,
+                "equityBets": [
+                    {"ticker": "AXON", "role": "BENEFICIARY", "rationale": "Axon body cameras with tamper-proof chains of custody become the gold standard"},
+                    {"ticker": "ONTO", "role": "BENEFICIARY", "rationale": "Onto Innovation's inspection tech applies to document and evidence verification"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_cognitive_decline",
@@ -495,7 +800,32 @@ SEED_DATA = [
             {"name": "ThinkWithout", "oneLiner": "Productivity tool that blocks AI assistance for certain tasks.", "timing": "TOO_EARLY", "timeHorizon": "1-3yr"},
             {"name": "CognitiveRx", "oneLiner": "Corporate wellness program measuring and improving employee cognitive performance.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_cognitive_human_premium_hiring",
+                "order": 2,
+                "title": "Critical Thinkers Command 3x Salaries",
+                "description": "As most workers become AI-dependent button-pushers, people who can actually think independently become extraordinarily scarce and valuable. A cognitive elite emerges.",
+                "initialTHI": 45,
+                "equityBets": [
+                    {"ticker": "HIMS", "role": "BENEFICIARY", "rationale": "Hims nootropics and cognitive supplements capture demand from workers trying to stay sharp"},
+                    {"ticker": "DUOL", "role": "BENEFICIARY", "rationale": "Duolingo-style brain exercise apps become professional necessities"},
+                    {"ticker": "LULU", "role": "CANARY", "rationale": "Lululemon's mindfulness and wellness positioning signals mainstream cognitive health awareness"}
+                ]
+            },
+            {
+                "id": "effect_cognitive_education_overhaul",
+                "order": 2,
+                "title": "Schools Ban AI and Go Back to Basics",
+                "description": "Alarmed by declining student cognition, school districts mandate pen-and-paper learning, memorization drills, and AI-free classrooms. EdTech faces a reckoning.",
+                "initialTHI": 50,
+                "equityBets": [
+                    {"ticker": "STRA", "role": "BENEFICIARY", "rationale": "Strategic Education's vocational hands-on training model thrives in an AI-skeptic education environment"},
+                    {"ticker": "TWOU", "role": "HEADWIND", "rationale": "2U's online-first education model faces backlash from anti-screen, anti-AI sentiment"},
+                    {"ticker": "MSFT", "role": "CANARY", "rationale": "Microsoft Copilot adoption in schools signals whether education embraces or rejects AI tools"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_taiwan_chip_risk",
@@ -521,7 +851,44 @@ SEED_DATA = [
             {"name": "ChipMapper", "oneLiner": "Supply chain mapping tool that shows companies their Taiwan chip exposure.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"},
             {"name": "ReShoreAI", "oneLiner": "Procurement platform that finds US alternatives for Taiwan-dependent components.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_chips_defense_stocks_surge",
+                "order": 2,
+                "title": "Defense Primes Get a Blank Check",
+                "description": "A Taiwan crisis turns into the largest defense mobilization since the Cold War. Missile systems, naval assets, and cyber capabilities get emergency funding.",
+                "initialTHI": 55,
+                "equityBets": [
+                    {"ticker": "LMT", "role": "BENEFICIARY", "rationale": "Lockheed Martin missile and naval systems get emergency procurement orders"},
+                    {"ticker": "RTX", "role": "BENEFICIARY", "rationale": "RTX Patriot missile systems and Pratt & Whitney engines surge on Pacific theater demand"},
+                    {"ticker": "PLTR", "role": "BENEFICIARY", "rationale": "Palantir's intelligence platform becomes critical for Pacific theater operations"}
+                ]
+            },
+            {
+                "id": "effect_chips_consumer_electronics_shock",
+                "order": 2,
+                "title": "iPhone Prices Double Overnight",
+                "description": "With TSMC fabs offline, advanced chip supply drops 90%. Consumer electronics prices skyrocket and waitlists stretch to months. Used devices become liquid assets.",
+                "initialTHI": 48,
+                "equityBets": [
+                    {"ticker": "AAPL", "role": "HEADWIND", "rationale": "Apple can't build iPhones without TSMC — production halts devastate revenue"},
+                    {"ticker": "SWAV", "role": "BENEFICIARY", "rationale": "Shockwave medical devices with non-Taiwan chip supply chains gain competitive advantage"},
+                    {"ticker": "GFS", "role": "BENEFICIARY", "rationale": "GlobalFoundries US-based fabs become the only game in town for mature-node chips"}
+                ]
+            },
+            {
+                "id": "effect_chips_tech_cold_war",
+                "order": 2,
+                "title": "US-China Tech Decoupling Goes Total",
+                "description": "A Taiwan crisis forces complete bifurcation of global tech supply chains. Every company must choose a side, creating two parallel technology ecosystems.",
+                "initialTHI": 43,
+                "equityBets": [
+                    {"ticker": "AMAT", "role": "BENEFICIARY", "rationale": "Applied Materials chip equipment becomes strategic infrastructure for US fab buildout"},
+                    {"ticker": "KLAC", "role": "BENEFICIARY", "rationale": "KLA Corp's inspection tools are essential for every new domestic fab"},
+                    {"ticker": "BABA", "role": "HEADWIND", "rationale": "Alibaba becomes uninvestable for Western capital in a full decoupling scenario"}
+                ]
+            }
+        ]
     },
     {
         "id": "thesis_dead_internet",
@@ -547,7 +914,44 @@ SEED_DATA = [
             {"name": "HumanFirst Ads", "oneLiner": "Ad network that exclusively serves verified human audiences — charges 10x CPM premium.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"},
             {"name": "BotAudit", "oneLiner": "Third-party ad traffic verification service for CMOs.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"}
         ],
-        "effects": []
+        "effects": [
+            {
+                "id": "effect_deadinternet_influencer_collapse",
+                "order": 2,
+                "title": "Influencer Marketing Implodes",
+                "description": "Brands discover that 60-80% of influencer followers are bots. The $20B influencer industry faces a reckoning as CPMs get repriced to real human eyeballs.",
+                "initialTHI": 56,
+                "equityBets": [
+                    {"ticker": "SNAP", "role": "HEADWIND", "rationale": "Snapchat's creator economy is most exposed to bot-follower repricing"},
+                    {"ticker": "PINS", "role": "BENEFICIARY", "rationale": "Pinterest's intent-based model is less vulnerable to fake engagement than follower-based platforms"},
+                    {"ticker": "DV", "role": "BENEFICIARY", "rationale": "DoubleVerify's ad verification tools become essential as brands demand proof of human audiences"}
+                ]
+            },
+            {
+                "id": "effect_deadinternet_tv_revival",
+                "order": 2,
+                "title": "Traditional TV Gets a Second Wind",
+                "description": "Advertisers flee digital channels they can't trust and return to TV where human audiences are measurable. Linear TV ad rates stabilize after years of decline.",
+                "initialTHI": 44,
+                "equityBets": [
+                    {"ticker": "PARA", "role": "BENEFICIARY", "rationale": "Paramount's broadcast and cable assets become trusted human-audience inventory"},
+                    {"ticker": "CMCSA", "role": "BENEFICIARY", "rationale": "Comcast's NBC and Peacock benefit from advertisers seeking verified human attention"},
+                    {"ticker": "IAS", "role": "BENEFICIARY", "rationale": "Integral Ad Science verification tools become mandatory for every digital ad buy"}
+                ]
+            },
+            {
+                "id": "effect_deadinternet_seo_death",
+                "order": 2,
+                "title": "SEO Dies and Google Search Degrades",
+                "description": "AI-generated content farms flood search results with optimized garbage. Google's search quality collapses, accelerating the shift to AI chatbots and curated platforms.",
+                "initialTHI": 65,
+                "equityBets": [
+                    {"ticker": "GOOGL", "role": "HEADWIND", "rationale": "Google search quality degradation directly threatens their core ad business"},
+                    {"ticker": "RDDT", "role": "BENEFICIARY", "rationale": "Reddit becomes the de facto search engine as people append 'reddit' to every query"},
+                    {"ticker": "MSFT", "role": "BENEFICIARY", "rationale": "Microsoft Bing with Copilot captures share as Google search trust erodes"}
+                ]
+            }
+        ]
     }
 ]
 

@@ -7,6 +7,11 @@ interface NeedleProps {
   size?: "sm" | "md" | "lg";
   label?: string;
   animated?: boolean;
+  breakdown?: {
+    evidence?: { score: number; weight: number };
+    momentum?: { score: number; weight: number };
+    conviction?: { score: number; weight: number };
+  };
 }
 
 const SIZES = {
@@ -20,7 +25,7 @@ function getComputedCSSVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-export default function Needle({ score, size = "md", label = "THI", animated = true }: NeedleProps) {
+export default function Needle({ score, size = "md", label = "THI", animated = true, breakdown }: NeedleProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [displayScore, setDisplayScore] = useState(animated ? 0 : score);
   const animationRef = useRef<number | null>(null);
@@ -76,9 +81,9 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     ctx.scale(dpr, dpr);
 
     // Read CSS vars
-    const muted = getComputedCSSVar("--text-muted") || "#6B6B6B";
-    const accent = getComputedCSSVar("--accent") || "#C4A882";
-    const surfaceAlt = getComputedCSSVar("--surface-alt") || "#2A2A2A";
+    const muted = getComputedCSSVar("--text-muted") || "#8A8580";
+    const accent = getComputedCSSVar("--accent") || "#E8440A";
+    const surfaceAlt = getComputedCSSVar("--surface-alt") || "#2A2723";
 
     // Clear
     ctx.clearRect(0, 0, cfg.width, cfg.height);
@@ -140,6 +145,12 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     ctx.lineCap = "round";
     ctx.stroke();
 
+    // Needle tip dot
+    ctx.beginPath();
+    ctx.arc(needleX, needleY, size === "lg" ? 4 : 3, 0, Math.PI * 2);
+    ctx.fillStyle = accent;
+    ctx.fill();
+
     // Center dot
     ctx.beginPath();
     ctx.arc(cx, cy, 3, 0, Math.PI * 2);
@@ -185,11 +196,43 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
   }, []);
 
   const cfg = SIZES[size];
+
+  // Build formula string
+  const formulaStr = breakdown
+    ? (() => {
+        const parts: string[] = [];
+        const e = breakdown.evidence;
+        const m = breakdown.momentum;
+        const c = breakdown.conviction;
+        if (e) parts.push(`E ${Math.round(e.score)}×${e.weight.toFixed(2)}`);
+        if (m) parts.push(`M ${Math.round(m.score)}×${m.weight.toFixed(2)}`);
+        if (c) parts.push(`C ${Math.round(c.score)}×${c.weight.toFixed(2)}`);
+        return parts.join(" + ") + ` = ${Math.round(score)}`;
+      })()
+    : null;
+
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: cfg.width, height: cfg.height }}
-      className="block"
-    />
+    <div className="flex flex-col items-center">
+      <canvas
+        ref={canvasRef}
+        style={{ width: cfg.width, height: cfg.height }}
+        className="block"
+      />
+      {formulaStr && (
+        <div
+          className="mt-1 text-center"
+          style={{
+            fontFamily: "JetBrains Mono, monospace",
+            fontSize: size === "lg" ? "12px" : size === "md" ? "10px" : "9px",
+            color: "var(--text-muted)",
+            letterSpacing: "-0.02em",
+            maxWidth: cfg.width,
+            lineHeight: "1.4",
+          }}
+        >
+          {formulaStr}
+        </div>
+      )}
+    </div>
   );
 }

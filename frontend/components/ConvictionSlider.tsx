@@ -48,7 +48,7 @@ export default function ConvictionSlider({
       <div className="flex items-center gap-3">
         <span
           className="text-xs uppercase"
-          style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
+          style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
         >
           CONVICTION
         </span>
@@ -71,7 +71,7 @@ export default function ConvictionSlider({
           style={{
             color: "var(--text)",
             fontFamily: "JetBrains Mono, monospace",
-            fontSize: "14px",
+            fontSize: "16px",
             minWidth: "32px",
           }}
         >
@@ -114,7 +114,7 @@ export default function ConvictionSlider({
             borderColor: "var(--accent)",
             color: "var(--accent)",
             fontFamily: "JetBrains Mono, monospace",
-            fontSize: "11px",
+            fontSize: "13px",
           }}
         >
           {divergenceWarning}

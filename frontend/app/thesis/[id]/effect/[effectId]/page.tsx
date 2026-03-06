@@ -44,7 +44,7 @@ export default function EffectDetailPage() {
     return (
       <main className="min-h-screen" style={{ background: "var(--bg)" }}>
         <Header />
-        <div className="px-12 py-8" style={{ color: "var(--text-muted)" }}>Effect not found.</div>
+        <div className="px-12 py-8" style={{ color: "var(--text-muted)", fontSize: "15px" }}>Effect not found.</div>
       </main>
     );
   }
@@ -55,24 +55,24 @@ export default function EffectDetailPage() {
       <Header />
       <div className="px-12 py-8">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
           <Link
             href="/"
-            className="text-xs uppercase hover:underline"
-            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", textUnderlineOffset: "3px" }}
+            className="uppercase hover:underline"
+            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", textUnderlineOffset: "3px", fontSize: "13px" }}
           >
             TANGENTBOOK
           </Link>
-          <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>/</span>
+          <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>/</span>
           <Link
             href={`/thesis/${thesisId}`}
-            className="text-xs uppercase hover:underline"
-            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", textUnderlineOffset: "3px" }}
+            className="uppercase hover:underline"
+            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", textUnderlineOffset: "3px", fontSize: "13px" }}
           >
             {thesis.title}
           </Link>
-          <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>/</span>
-          <span className="text-xs uppercase" style={{ color: "var(--text)", letterSpacing: "0.08em" }}>
+          <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>/</span>
+          <span className="uppercase" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}>
             {effect.title}
           </span>
         </div>
@@ -82,43 +82,43 @@ export default function EffectDetailPage() {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
               <span
-                className="text-xs uppercase px-2 py-0.5 border"
-                style={{ color: "var(--text-muted)", borderColor: "var(--border)", letterSpacing: "0.08em", fontSize: "10px" }}
+                className="uppercase px-2 py-0.5 border"
+                style={{ color: "var(--text-muted)", borderColor: "var(--border)", letterSpacing: "0.08em", fontSize: "12px" }}
               >
                 {effect.order === 2 ? "2ND ORDER" : "3RD ORDER"} EFFECT
               </span>
             </div>
             <h1
               className="font-bold uppercase text-2xl mb-2"
-              style={{ color: "var(--text)", letterSpacing: "-0.04em" }}
+              style={{ color: "var(--text)", letterSpacing: "-0.04em", wordWrap: "break-word", overflowWrap: "break-word" }}
             >
               {effect.title}
             </h1>
-            <p className="text-base mb-4" style={{ color: "var(--text-muted)", lineHeight: "1.6" }}>
+            <p className="mb-4" style={{ color: "var(--text-muted)", lineHeight: "1.6", fontSize: "16px", wordWrap: "break-word", overflowWrap: "break-word" }}>
               {effect.description}
             </p>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6 flex-wrap">
               <div className="flex items-center gap-2">
-                <span className="text-xs uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}>
+                <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}>
                   PARENT THI
                 </span>
-                <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+                <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
                   {Math.round(thesis.thi.score)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}>
+                <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}>
                   INHERITANCE
                 </span>
-                <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+                <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
                   {(effect.inheritanceWeight * 100).toFixed(0)}%
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}>
+                <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}>
                   CONVICTION
                 </span>
-                <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+                <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
                   {effect.userConviction.score}/10
                 </span>
               </div>
@@ -135,8 +135,8 @@ export default function EffectDetailPage() {
         {effect.equityBets.length > 0 && (
           <>
             <h3
-              className="text-xs uppercase mb-4"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em" }}
+              className="uppercase mb-4"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
             >
               EQUITY BETS
             </h3>
@@ -153,8 +153,8 @@ export default function EffectDetailPage() {
           <>
             <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
             <h3
-              className="text-xs uppercase mb-4"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em" }}
+              className="uppercase mb-4"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
             >
               STARTUP OPPORTUNITIES
             </h3>
@@ -171,8 +171,8 @@ export default function EffectDetailPage() {
           <>
             <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
             <h3
-              className="text-xs uppercase mb-4"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em" }}
+              className="uppercase mb-4"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
             >
               3RD ORDER EFFECTS
             </h3>
@@ -180,18 +180,18 @@ export default function EffectDetailPage() {
               {effect.childEffects.map((child) => (
                 <div
                   key={child.id}
-                  className="border p-4"
+                  className="border p-5"
                   style={{ background: "var(--surface)", borderColor: "var(--border)" }}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 mr-3">
                       <h4
-                        className="font-bold uppercase text-xs"
-                        style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3" }}
+                        className="font-bold uppercase"
+                        style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}
                       >
                         {child.title}
                       </h4>
-                      <p className="mt-1 text-xs" style={{ color: "var(--text-muted)", lineHeight: "1.4" }}>
+                      <p className="mt-1" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
                         {child.description}
                       </p>
                     </div>

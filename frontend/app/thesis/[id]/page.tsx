@@ -9,6 +9,7 @@ import EquityBetCard from "@/components/EquityBetCard";
 import StartupCard from "@/components/StartupCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import EffectChain from "@/components/EffectChain";
+import ConvictionSlider from "@/components/ConvictionSlider";
 import { api, ThesisDetail, Feed, Effect } from "@/lib/api";
 
 export default function ThesisDetailPage() {
@@ -18,6 +19,11 @@ export default function ThesisDetailPage() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [loading, setLoading] = useState(true);
   const [feedsOpen, setFeedsOpen] = useState(false);
+
+  const reloadThesis = async () => {
+    const t = await api.getThesis(id);
+    setThesis(t);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -45,10 +51,15 @@ export default function ThesisDetailPage() {
     return (
       <main className="min-h-screen" style={{ background: "var(--bg)" }}>
         <Header />
-        <div className="px-12 py-8" style={{ color: "var(--text-muted)" }}>Thesis not found.</div>
+        <div className="px-12 py-8" style={{ color: "var(--text-muted)", fontSize: "15px" }}>Thesis not found.</div>
       </main>
     );
   }
+
+  const handleConviction = async (score: number, note?: string) => {
+    await api.updateConviction(id, score, note);
+    await reloadThesis();
+  };
 
   return (
     <ErrorBoundary>
@@ -59,15 +70,15 @@ export default function ThesisDetailPage() {
         <div className="flex items-center gap-2 mb-6">
           <Link
             href="/"
-            className="text-xs uppercase hover:underline"
-            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", textUnderlineOffset: "3px" }}
+            className="uppercase hover:underline"
+            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", textUnderlineOffset: "3px", fontSize: "13px" }}
           >
             TANGENTBOOK
           </Link>
-          <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>/</span>
+          <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>/</span>
           <span
-            className="text-xs uppercase"
-            style={{ color: "var(--text)", letterSpacing: "0.08em" }}
+            className="uppercase"
+            style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}
           >
             {thesis.title}
           </span>
@@ -78,54 +89,53 @@ export default function ThesisDetailPage() {
           <div className="flex-1">
             <h1
               className="font-bold uppercase text-3xl mb-2"
-              style={{ color: "var(--text)", letterSpacing: "-0.04em" }}
+              style={{ color: "var(--text)", letterSpacing: "-0.04em", wordWrap: "break-word", overflowWrap: "break-word" }}
             >
               {thesis.title}
             </h1>
-            <p className="text-base mb-4" style={{ color: "var(--text-muted)", lineHeight: "1.6" }}>
+            <p className="mb-4" style={{ color: "var(--text-muted)", lineHeight: "1.6", fontSize: "16px", wordWrap: "break-word", overflowWrap: "break-word" }}>
               {thesis.description}
             </p>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6 flex-wrap">
               <div className="flex items-center gap-2">
-                <span className="text-xs uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}>
+                <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}>
                   HORIZON
                 </span>
-                <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+                <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
                   {thesis.timeHorizon}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}>
-                  CONVICTION
-                </span>
-                <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
-                  {thesis.userConviction.score}/10
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}>
+                <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}>
                   DIRECTION
                 </span>
-                <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+                <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
                   {thesis.thi.direction.toUpperCase()}
                 </span>
               </div>
             </div>
-            {thesis.userConviction.divergenceWarning && (
-              <div
-                className="mt-3 px-3 py-2 border text-xs"
-                style={{
-                  borderColor: "var(--accent)",
-                  color: "var(--accent)",
-                  fontFamily: "JetBrains Mono, monospace",
-                }}
-              >
-                {thesis.userConviction.divergenceWarning}
-              </div>
-            )}
+
+            {/* Conviction Slider - only on detail page */}
+            <div className="mt-4">
+              <ConvictionSlider
+                score={thesis.userConviction.score}
+                history={thesis.userConviction.history?.map((h) => h.score) || []}
+                onUpdate={handleConviction}
+                divergenceWarning={thesis.userConviction.divergenceWarning}
+              />
+            </div>
           </div>
           <div className="flex-shrink-0">
-            <Needle score={thesis.thi.score} size="lg" label="THESIS HEALTH INDEX" />
+            <Needle
+              score={thesis.thi.score}
+              size="lg"
+              label="THESIS HEALTH INDEX"
+              breakdown={{
+                evidence: thesis.thi.evidence,
+                momentum: thesis.thi.momentum,
+                conviction: thesis.thi.conviction,
+              }}
+            />
           </div>
         </div>
 
@@ -137,8 +147,8 @@ export default function ThesisDetailPage() {
           <div className="text-center">
             <Needle score={thesis.thi.evidence.score} size="md" label="EVIDENCE" />
             <span
-              className="text-xs uppercase mt-1 block"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}
+              className="uppercase mt-1 block"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}
             >
               WEIGHT {(thesis.thi.evidence.weight * 100).toFixed(0)}%
             </span>
@@ -146,8 +156,8 @@ export default function ThesisDetailPage() {
           <div className="text-center">
             <Needle score={thesis.thi.momentum.score} size="md" label="MOMENTUM" />
             <span
-              className="text-xs uppercase mt-1 block"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}
+              className="uppercase mt-1 block"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}
             >
               WEIGHT {(thesis.thi.momentum.weight * 100).toFixed(0)}%
             </span>
@@ -155,8 +165,8 @@ export default function ThesisDetailPage() {
           <div className="text-center">
             <Needle score={thesis.thi.conviction.score} size="md" label="DATA QUALITY" />
             <span
-              className="text-xs uppercase mt-1 block"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}
+              className="uppercase mt-1 block"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}
             >
               WEIGHT {(thesis.thi.conviction.weight * 100).toFixed(0)}%
             </span>
@@ -170,7 +180,7 @@ export default function ThesisDetailPage() {
         <div className="mb-8">
           <button
             onClick={() => setFeedsOpen(!feedsOpen)}
-            className="text-xs uppercase mb-4 flex items-center gap-2"
+            className="uppercase mb-4 flex items-center gap-2"
             style={{
               color: "var(--text-muted)",
               letterSpacing: "0.08em",
@@ -178,10 +188,11 @@ export default function ThesisDetailPage() {
               border: "none",
               cursor: "pointer",
               fontFamily: "Inter, system-ui, sans-serif",
+              fontSize: "13px",
             }}
           >
             FEEDS ({feeds.length})
-            <span style={{ fontSize: "10px" }}>{feedsOpen ? "−" : "+"}</span>
+            <span style={{ fontSize: "12px" }}>{feedsOpen ? "−" : "+"}</span>
           </button>
 
           {feedsOpen && (
@@ -193,7 +204,7 @@ export default function ThesisDetailPage() {
                   setThesis(t);
                   setFeeds(f);
                 }}
-                className="text-xs uppercase hover:underline"
+                className="uppercase hover:underline"
                 style={{
                   color: "var(--text-muted)",
                   letterSpacing: "0.08em",
@@ -201,6 +212,7 @@ export default function ThesisDetailPage() {
                   border: "none",
                   cursor: "pointer",
                   textUnderlineOffset: "3px",
+                  fontSize: "13px",
                 }}
               >
                 REFRESH
@@ -210,7 +222,7 @@ export default function ThesisDetailPage() {
                 const offline = feeds.filter((f) => f.status === "offline").length;
                 const degraded = feeds.filter((f) => f.status === "degraded").length;
                 return (
-                  <span style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "11px" }}>
+                  <span style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
                     {live} live / {feeds.length - live - offline - degraded} stale / {degraded} degraded / {offline} offline
                   </span>
                 );
@@ -230,34 +242,33 @@ export default function ThesisDetailPage() {
                   }}
                 >
                   <span
-                    className="text-xs uppercase px-2 py-0.5 border flex-shrink-0"
+                    className="uppercase px-2 py-0.5 border flex-shrink-0"
                     style={{
                       color: "var(--text-muted)",
                       borderColor: "var(--border)",
                       letterSpacing: "0.08em",
-                      fontSize: "9px",
+                      fontSize: "11px",
                       minWidth: "60px",
                       textAlign: "center",
                     }}
                   >
                     {feed.source}
                   </span>
-                  <span className="text-xs flex-1" style={{ color: "var(--text)" }}>
+                  <span className="flex-1" style={{ color: "var(--text)", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
                     {feed.name}
                   </span>
                   <span
-                    className="text-xs"
-                    style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace" }}
+                    style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}
                   >
                     {feed.lastFetched ? new Date(feed.lastFetched).toLocaleDateString() : "——"}
                   </span>
                   <span
-                    className="text-xs"
                     style={{
                       color: "var(--text)",
                       fontFamily: "JetBrains Mono, monospace",
                       minWidth: "32px",
                       textAlign: "right",
+                      fontSize: "13px",
                     }}
                   >
                     {feed.normalizedScore != null ? Math.round(feed.normalizedScore) : "——"}
@@ -274,8 +285,8 @@ export default function ThesisDetailPage() {
           <>
             <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
             <h3
-              className="text-xs uppercase mb-4"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em" }}
+              className="uppercase mb-4"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
             >
               EQUITY BETS
             </h3>
@@ -292,8 +303,8 @@ export default function ThesisDetailPage() {
           <>
             <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
             <h3
-              className="text-xs uppercase mb-4"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em" }}
+              className="uppercase mb-4"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
             >
               STARTUP OPPORTUNITIES
             </h3>
@@ -311,8 +322,8 @@ export default function ThesisDetailPage() {
           <>
             <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
             <h3
-              className="text-xs uppercase mb-4"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em" }}
+              className="uppercase mb-4"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
             >
               EFFECT CHAIN
             </h3>
@@ -331,22 +342,16 @@ export default function ThesisDetailPage() {
         <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
         <div className="flex items-center justify-between mb-4">
           <h3
-            className="text-xs uppercase"
-            style={{ color: "var(--text-muted)", letterSpacing: "0.08em" }}
+            className="uppercase"
+            style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
           >
             2ND ORDER EFFECTS ({thesis.effects.length})
           </h3>
-          <AddEffectButton thesisId={thesis.id} onCreated={async () => {
-            const t = await api.getThesis(id);
-            setThesis(t);
-          }} />
+          <AddEffectButton thesisId={thesis.id} onCreated={reloadThesis} />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
           {thesis.effects.map((effect) => (
-            <EffectCard key={effect.id} effect={effect} thesisId={thesis.id} onUpdated={async () => {
-              const t = await api.getThesis(id);
-              setThesis(t);
-            }} />
+            <EffectCard key={effect.id} effect={effect} thesisId={thesis.id} onUpdated={reloadThesis} />
           ))}
         </div>
       </div>
@@ -371,30 +376,28 @@ function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId:
           <div className="flex items-start justify-between">
             <Link
               href={`/thesis/${thesisId}/effect/${effect.id}`}
-              className="font-bold uppercase text-xs hover:underline"
-              style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", textUnderlineOffset: "3px" }}
+              className="font-bold uppercase hover:underline"
+              style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", textUnderlineOffset: "3px", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}
             >
               {effect.title}
             </Link>
             <div className="flex items-center gap-1 ml-1">
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="text-xs"
-                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
               >
                 {expanded ? "−" : "+"}
               </button>
               <button
                 onClick={handleDelete}
-                className="text-xs"
-                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
                 title="Delete effect"
               >
                 x
               </button>
             </div>
           </div>
-          <p className="mt-1 text-xs" style={{ color: "var(--text-muted)", lineHeight: "1.4" }}>
+          <p className="mt-1" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
             {effect.description}
           </p>
         </div>
@@ -405,15 +408,15 @@ function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId:
         <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
           {effect.equityBets.length > 0 && (
             <div className="mb-3">
-              <span className="text-xs uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}>
+              <span className="uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
                 EQUITY BETS
               </span>
               {effect.equityBets.map((bet) => (
                 <div key={bet.id} className="flex items-center gap-3 mb-1">
-                  <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>{bet.ticker}</span>
-                  <span className="text-xs uppercase" style={{
+                  <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "14px" }}>{bet.ticker}</span>
+                  <span className="uppercase" style={{
                     color: bet.role === "BENEFICIARY" ? "var(--positive)" : bet.role === "HEADWIND" ? "var(--text-muted)" : "var(--accent)",
-                    fontSize: "9px", letterSpacing: "0.08em",
+                    fontSize: "11px", letterSpacing: "0.08em",
                   }}>{bet.role}</span>
                 </div>
               ))}
@@ -421,11 +424,11 @@ function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId:
           )}
           {effect.startupOpportunities.length > 0 && (
             <div>
-              <span className="text-xs uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "10px" }}>
+              <span className="uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
                 OPPORTUNITIES
               </span>
               {effect.startupOpportunities.map((opp) => (
-                <div key={opp.id} className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+                <div key={opp.id} className="mb-1" style={{ color: "var(--text-muted)", fontSize: "14px" }}>
                   <span style={{ color: "var(--text)" }}>{opp.name}</span> — {opp.oneLiner}
                 </div>
               ))}
@@ -455,7 +458,7 @@ function AddEffectButton({ thesisId, onCreated }: { thesisId: string; onCreated:
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-xs uppercase"
+        className="uppercase"
         style={{
           color: "var(--text-muted)",
           letterSpacing: "0.08em",
@@ -464,6 +467,7 @@ function AddEffectButton({ thesisId, onCreated }: { thesisId: string; onCreated:
           cursor: "pointer",
           textDecoration: "underline",
           textUnderlineOffset: "3px",
+          fontSize: "13px",
         }}
       >
         + ADD 2ND ORDER EFFECT
@@ -478,29 +482,28 @@ function AddEffectButton({ thesisId, onCreated }: { thesisId: string; onCreated:
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Effect title"
-        className="text-xs px-2 py-1 border"
-        style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)", outline: "none" }}
+        className="px-2 py-1 border"
+        style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)", outline: "none", fontSize: "14px" }}
       />
       <input
         type="text"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description"
-        className="text-xs px-2 py-1 border flex-1"
-        style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)", outline: "none" }}
+        className="px-2 py-1 border flex-1"
+        style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)", outline: "none", fontSize: "14px" }}
         onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
       />
       <button
         onClick={handleSubmit}
-        className="text-xs uppercase px-2 py-1 border"
-        style={{ color: "var(--text)", borderColor: "var(--text)", background: "none", cursor: "pointer", letterSpacing: "0.08em" }}
+        className="uppercase px-2 py-1 border"
+        style={{ color: "var(--text)", borderColor: "var(--text)", background: "none", cursor: "pointer", letterSpacing: "0.08em", fontSize: "13px" }}
       >
         ADD
       </button>
       <button
         onClick={() => setOpen(false)}
-        className="text-xs"
-        style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+        style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
       >
         x
       </button>
@@ -526,8 +529,8 @@ function StatusDot({ status }: { status: string }) {
       />
       {status !== "live" && (
         <span
-          className="text-xs uppercase"
-          style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "9px" }}
+          className="uppercase"
+          style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
         >
           {status.toUpperCase()}
         </span>

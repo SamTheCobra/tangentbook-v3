@@ -27,7 +27,7 @@ export default function EffectChain({ thesisId, thesisTitle, thesisScore, effect
         {/* Connector */}
         <div className="flex items-center self-center">
           <div style={{ width: "32px", height: "1px", background: "var(--border)" }} />
-          <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>&rarr;</span>
+          <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>&rarr;</span>
           <div style={{ width: "8px", height: "1px", background: "var(--border)" }} />
         </div>
 
@@ -47,7 +47,7 @@ export default function EffectChain({ thesisId, thesisTitle, thesisScore, effect
                 <>
                   <div className="flex items-center self-center">
                     <div style={{ width: "24px", height: "1px", background: "var(--border)" }} />
-                    <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>&rarr;</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>&rarr;</span>
                     <div style={{ width: "8px", height: "1px", background: "var(--border)" }} />
                   </div>
                   <div className="flex flex-col gap-2">
@@ -91,17 +91,19 @@ function ChainNode({
       style={{
         background: "var(--surface)",
         borderColor,
-        maxWidth: "180px",
+        maxWidth: "200px",
       }}
     >
       <div
-        className="text-xs uppercase"
+        className="uppercase"
         style={{
           color: "var(--text)",
           letterSpacing: "-0.02em",
           fontFamily: "JetBrains Mono, monospace",
-          fontSize: "10px",
+          fontSize: "12px",
           lineHeight: "1.3",
+          wordWrap: "break-word",
+          overflowWrap: "break-word",
         }}
       >
         {label}
@@ -111,7 +113,7 @@ function ChainNode({
         style={{
           color: isRoot ? "var(--accent)" : "var(--text-muted)",
           fontFamily: "JetBrains Mono, monospace",
-          fontSize: "11px",
+          fontSize: "13px",
         }}
       >
         {Math.round(score)}

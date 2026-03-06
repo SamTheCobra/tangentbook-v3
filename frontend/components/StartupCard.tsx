@@ -2,49 +2,62 @@
 
 import { StartupOpportunity } from "@/lib/api";
 
+const ALL_TIMINGS = ["TOO_EARLY", "RIGHT_TIMING", "CROWDING"] as const;
+
 interface StartupCardProps {
   opportunity: StartupOpportunity;
 }
 
 export default function StartupCard({ opportunity }: StartupCardProps) {
-  const timingColor =
-    opportunity.timing === "RIGHT_TIMING"
-      ? "var(--positive)"
-      : opportunity.timing === "TOO_EARLY"
-      ? "var(--text-muted)"
-      : "var(--accent)";
-
   return (
     <div
-      className="border p-4"
+      className="border p-5"
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-bold text-sm" style={{ color: "var(--text)" }}>
+      <div className="mb-2">
+        <span className="font-bold" style={{ color: "var(--text)", fontSize: "16px" }}>
           {opportunity.name}
         </span>
-        <span
-          className="text-xs uppercase px-2 py-0.5 border"
-          style={{
-            color: timingColor,
-            borderColor: timingColor,
-            letterSpacing: "0.08em",
-            fontSize: "9px",
-          }}
-        >
-          {opportunity.timing.replace(/_/g, " ")}
-        </span>
       </div>
-      <p className="text-xs" style={{ color: "var(--text-muted)", lineHeight: "1.4" }}>
+      <p style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
         {opportunity.oneLiner}
       </p>
+
+      {/* Timing badges — all shown, active highlighted */}
+      <div className="mt-3 flex items-center gap-2">
+        {ALL_TIMINGS.map((timing) => {
+          const isActive = opportunity.timing === timing;
+          const activeColor =
+            timing === "RIGHT_TIMING"
+              ? "var(--positive)"
+              : timing === "TOO_EARLY"
+              ? "var(--text-muted)"
+              : "var(--accent)";
+          return (
+            <span
+              key={timing}
+              className="uppercase px-2 py-0.5 border"
+              style={{
+                color: isActive ? activeColor : "var(--border)",
+                borderColor: isActive ? activeColor : "var(--border)",
+                letterSpacing: "0.08em",
+                fontSize: "11px",
+                opacity: isActive ? 1 : 0.4,
+              }}
+            >
+              {timing.replace(/_/g, " ")}
+            </span>
+          );
+        })}
+      </div>
+
       <div className="mt-2">
         <span
-          className="text-xs uppercase"
+          className="uppercase"
           style={{
             color: "var(--text-muted)",
             letterSpacing: "0.08em",
-            fontSize: "9px",
+            fontSize: "11px",
           }}
         >
           {opportunity.timeHorizon}
