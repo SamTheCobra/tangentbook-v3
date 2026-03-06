@@ -3,25 +3,12 @@
 import { useState } from "react";
 import { EquityBet, EFSScore } from "@/lib/api";
 import StockSparkline from "./StockSparkline";
+import GradientBar from "./GradientBar";
 
 interface EquityBetCardProps {
   bet: EquityBet;
   efs?: EFSScore | null;
   rank?: number;
-}
-
-function EFSBar({ score, width }: { score: number; width?: string }) {
-  const pct = Math.max(0, Math.min(100, score));
-  const totalBlocks = 20;
-  const filledBlocks = Math.round((pct / 100) * totalBlocks);
-  const filled = "\u2588".repeat(filledBlocks);
-  const empty = "\u2591".repeat(totalBlocks - filledBlocks);
-  return (
-    <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", width }}>
-      <span style={{ color: "#FF4500" }}>{filled}</span>
-      <span style={{ color: "var(--border)" }}>{empty}</span>
-    </span>
-  );
 }
 
 function EFSBreakdownRow({
@@ -65,7 +52,9 @@ function EFSBreakdownRow({
         <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "13px", color: "var(--text)", minWidth: "24px" }}>
           {Math.round(score)}
         </span>
-        <EFSBar score={score} />
+        <span style={{ flex: 1 }}>
+          <GradientBar value={score} height={6} />
+        </span>
       </div>
       <div
         style={{
@@ -182,7 +171,9 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
                 >
                   EFS
                 </span>
-                <EFSBar score={efs.efsScore} />
+                <span style={{ flex: 1 }}>
+                  <GradientBar value={efs.efsScore} height={8} />
+                </span>
                 <span
                   style={{
                     fontFamily: "JetBrains Mono, monospace",

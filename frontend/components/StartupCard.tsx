@@ -1,6 +1,7 @@
 "use client";
 
 import { StartupOpportunity, STSScore } from "@/lib/api";
+import GradientBar from "./GradientBar";
 
 const ALL_TIMINGS = ["TOO_EARLY", "RIGHT_TIMING", "CROWDING"] as const;
 
@@ -28,27 +29,33 @@ export default function StartupCard({ opportunity, sts }: StartupCardProps) {
 
       {/* STS score + timing */}
       {sts ? (
-        <div className="mt-3 flex items-center gap-3">
-          <span
-            className="uppercase"
-            style={{
-              color: "var(--text-muted)",
-              letterSpacing: "0.08em",
-              fontSize: "11px",
-            }}
-          >
-            STS
-          </span>
-          <span
-            style={{
-              fontFamily: "JetBrains Mono, monospace",
-              fontSize: "13px",
-              color: "var(--text)",
-            }}
-          >
-            {Math.round(sts.stsScore)}/100
-          </span>
-          <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>&rarr;</span>
+        <div className="mt-3">
+          <div className="flex items-center gap-3 mb-2">
+            <span
+              className="uppercase"
+              style={{
+                color: "var(--text-muted)",
+                letterSpacing: "0.08em",
+                fontSize: "11px",
+                flexShrink: 0,
+              }}
+            >
+              STS
+            </span>
+            <span style={{ flex: 1 }}>
+              <GradientBar value={sts.stsScore} height={6} />
+            </span>
+            <span
+              style={{
+                fontFamily: "JetBrains Mono, monospace",
+                fontSize: "13px",
+                color: "var(--text)",
+                flexShrink: 0,
+              }}
+            >
+              {Math.round(sts.stsScore)}/100
+            </span>
+          </div>
           <span
             className="uppercase px-2 py-0.5 border"
             style={{
