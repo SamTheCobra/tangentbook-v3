@@ -298,34 +298,7 @@ export default function ThesisDetailPage() {
           ))}
         </div>
 
-        {/* 4th order note */}
-        <div className="mt-6 mb-8 flex items-center gap-3">
-          <span
-            style={{
-              color: "var(--text-muted)",
-              fontSize: "12px",
-              letterSpacing: "0.04em",
-              fontFamily: "JetBrains Mono, monospace",
-            }}
-          >
-            4th order effects available via AI generation →
-          </span>
-          <button
-            disabled
-            className="uppercase px-3 py-1 border"
-            style={{
-              color: "var(--text-muted)",
-              borderColor: "var(--border)",
-              letterSpacing: "0.08em",
-              background: "none",
-              cursor: "not-allowed",
-              fontSize: "11px",
-              opacity: 0.5,
-            }}
-          >
-            COMING SOON
-          </button>
-        </div>
+        <div className="mb-8" />
       </div>
     </main>
     </ErrorBoundary>
@@ -744,135 +717,159 @@ function FeedStatusBadge({ status }: { status: string }) {
 }
 
 function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId: string; onUpdated: () => void }) {
-  const [show3rd, setShow3rd] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  const handleDelete = async () => {
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!confirm(`Delete "${effect.title}"? This cannot be undone.`)) return;
     await api.deleteEffect(effect.id);
     onUpdated();
   };
 
+  const tickers = effect.equityBets.map((b) => b.ticker);
+  const hasContent = effect.equityBets.length > 0 || effect.startupOpportunities.length > 0 || (effect.childEffects && effect.childEffects.length > 0);
+
   return (
-    <div className="border p-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1 mr-3">
-          <div className="flex items-start justify-between">
-            <Link
-              href={`/thesis/${thesisId}/effect/${effect.id}`}
-              className="font-bold uppercase hover:underline"
-              style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", textUnderlineOffset: "3px", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}
-            >
-              {effect.title}
-            </Link>
-            <button
-              onClick={handleDelete}
-              className="ml-1 flex-shrink-0"
-              style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
-              title="Delete effect"
-            >
-              <TrashIcon size={14} />
-            </button>
+    <div
+      className="border"
+      style={{ background: "var(--surface)", borderColor: "var(--border)", cursor: hasContent ? "pointer" : "default" }}
+      onClick={() => hasContent && setExpanded(!expanded)}
+    >
+      {/* Collapsed: clean headline card */}
+      <div className="p-5">
+        <div className="flex items-start gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-2">
+              <Link
+                href={`/thesis/${thesisId}/effect/${effect.id}`}
+                className="font-bold uppercase hover:underline"
+                style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", textUnderlineOffset: "3px", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {effect.title}
+              </Link>
+              <button
+                onClick={handleDelete}
+                className="flex-shrink-0 mt-0.5"
+                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+                title="Delete effect"
+              >
+                <TrashIcon size={14} />
+              </button>
+            </div>
+            <p className="mt-2" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
+              {effect.description}
+            </p>
           </div>
-          <p className="mt-1" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
-            {effect.description}
-          </p>
+          <div className="flex-shrink-0 flex flex-col items-center">
+            <Needle score={effect.thi.score} size="sm" />
+            <span
+              style={{
+                color: "var(--text-muted)",
+                fontFamily: "JetBrains Mono, monospace",
+                fontSize: "11px",
+                marginTop: "2px",
+              }}
+            >
+              THI
+            </span>
+          </div>
         </div>
-        <Needle score={effect.thi.score} size="sm" />
-      </div>
 
-      {/* Equity Bets inline */}
-      {effect.equityBets.length > 0 && (
-        <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
-          <span className="uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
-            EQUITY BETS
-          </span>
-          {effect.equityBets.map((bet) => (
-            <div key={bet.id} className="flex items-center gap-3 mb-1">
-              <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "14px" }}>{bet.ticker}</span>
-              <span className="uppercase" style={{
-                color: bet.role === "BENEFICIARY" ? "#FF4500" : "#5A5A5A",
-                fontSize: "11px", letterSpacing: "0.08em",
-              }}>{bet.role}</span>
-              <span style={{ color: "var(--text-muted)", fontSize: "12px", flex: 1 }}>{bet.rationale}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Startup Opportunities inline */}
-      {effect.startupOpportunities.length > 0 && (
-        <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
-          <span className="uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
-            OPPORTUNITIES
-          </span>
-          {effect.startupOpportunities.map((opp) => (
-            <div key={opp.id} className="mb-1" style={{ color: "var(--text-muted)", fontSize: "13px" }}>
-              <span style={{ color: "var(--text)" }}>{opp.name}</span> — {opp.oneLiner}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* 3rd order effects toggle */}
-      {effect.childEffects && effect.childEffects.length > 0 && (
-        <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
-          <button
-            onClick={() => setShow3rd(!show3rd)}
-            className="uppercase flex items-center gap-1"
-            style={{
-              color: "var(--text-muted)",
-              letterSpacing: "0.08em",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "11px",
-            }}
-          >
-            {show3rd ? "▼" : "▶"} SHOW 3RD ORDER EFFECTS ({effect.childEffects.length})
-          </button>
-          {show3rd && (
-            <div className="mt-2 pl-4" style={{ borderLeft: "1px solid var(--border)" }}>
-              {effect.childEffects.map((child) => (
-                <div key={child.id} className="mb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 mr-3">
-                      <h4
-                        className="font-bold uppercase"
-                        style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", fontSize: "13px" }}
-                      >
-                        {child.title}
-                      </h4>
-                      <p className="mt-1" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "13px" }}>
-                        {child.description}
-                      </p>
-                      {child.equityBets && child.equityBets.length > 0 && (
-                        <div className="mt-1">
-                          {child.equityBets.map((bet) => (
-                            <span key={bet.id} className="mr-2" style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>
-                              {bet.ticker}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <Needle score={child.thi.score} size="sm" />
-                  </div>
-                </div>
+        {/* Footer: tickers + expand toggle */}
+        {hasContent && (
+          <div className="flex items-center justify-between mt-4">
+            <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+              {tickers.map((t, i) => (
+                <span key={t}>
+                  <span style={{ color: "#FF4500" }}>{t}</span>
+                  {i < tickers.length - 1 && <span style={{ color: "#5A5A5A" }}> · </span>}
+                </span>
               ))}
             </div>
-          )}
-        </div>
-      )}
+            <span
+              className="uppercase flex-shrink-0"
+              style={{
+                color: "var(--text-muted)",
+                letterSpacing: "0.08em",
+                fontSize: "11px",
+              }}
+            >
+              {expanded ? "— COLLAPSE ▲" : "+ EXPAND ▾"}
+            </span>
+          </div>
+        )}
+      </div>
 
-      {/* CTAs for empty sections */}
-      {effect.equityBets.length === 0 && effect.startupOpportunities.length === 0 && (!effect.childEffects || effect.childEffects.length === 0) && (
-        <div className="mt-3 pt-3 flex gap-4" style={{ borderTop: "1px solid var(--border)" }}>
-          <span className="uppercase" style={{ color: "var(--text-muted)", fontSize: "12px", letterSpacing: "0.08em", opacity: 0.6 }}>
-            + Add equity bet
-          </span>
-          <span className="uppercase" style={{ color: "var(--text-muted)", fontSize: "12px", letterSpacing: "0.08em", opacity: 0.6 }}>
-            + Add opportunity
-          </span>
+      {/* Expanded: full detail */}
+      {expanded && (
+        <div className="px-5 pb-5" onClick={(e) => e.stopPropagation()}>
+          {/* Equity Bets — full cards */}
+          {effect.equityBets.length > 0 && (
+            <div className="pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+              <span className="uppercase block mb-3" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
+                EQUITY BETS
+              </span>
+              <div className="grid grid-cols-1 gap-0">
+                {effect.equityBets.map((bet) => (
+                  <EquityBetCard key={bet.id} bet={bet} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Startup Opportunities */}
+          {effect.startupOpportunities.length > 0 && (
+            <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+              <span className="uppercase block mb-3" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
+                STARTUP OPPORTUNITIES
+              </span>
+              <div className="grid grid-cols-1 gap-0">
+                {effect.startupOpportunities.map((opp) => (
+                  <StartupCard key={opp.id} opportunity={opp} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 3rd order effects */}
+          {effect.childEffects && effect.childEffects.length > 0 && (
+            <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+              <span className="uppercase block mb-3" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
+                3RD ORDER EFFECTS ({effect.childEffects.length})
+              </span>
+              <div className="pl-4" style={{ borderLeft: "1px solid var(--border)" }}>
+                {effect.childEffects.map((child) => (
+                  <div key={child.id} className="mb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 mr-3">
+                        <h4
+                          className="font-bold uppercase"
+                          style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", fontSize: "13px" }}
+                        >
+                          {child.title}
+                        </h4>
+                        <p className="mt-1" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "13px" }}>
+                          {child.description}
+                        </p>
+                        {child.equityBets && child.equityBets.length > 0 && (
+                          <div className="mt-1" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>
+                            {child.equityBets.map((bet, i) => (
+                              <span key={bet.id}>
+                                <span style={{ color: "#FF4500" }}>{bet.ticker}</span>
+                                {i < child.equityBets.length - 1 && <span style={{ color: "#5A5A5A" }}> · </span>}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <Needle score={child.thi.score} size="sm" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
