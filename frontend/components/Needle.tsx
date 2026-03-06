@@ -92,8 +92,13 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     const gx1 = cx + radius;
     const grad = ctx.createLinearGradient(gx0, 0, gx1, 0);
     grad.addColorStop(0,    "rgba(232,68,10,0)");
-    grad.addColorStop(0.50, "rgba(232,68,10,0.08)");
-    grad.addColorStop(0.80, "rgba(232,68,10,0.35)");
+    grad.addColorStop(0.08, "rgba(232,68,10,0.01)");
+    grad.addColorStop(0.16, "rgba(232,68,10,0.03)");
+    grad.addColorStop(0.24, "rgba(232,68,10,0.06)");
+    grad.addColorStop(0.32, "rgba(232,68,10,0.12)");
+    grad.addColorStop(0.38, "rgba(232,68,10,0.20)");
+    grad.addColorStop(0.44, "rgba(232,68,10,0.32)");
+    grad.addColorStop(0.50, "rgba(232,68,10,0.65)");
     grad.addColorStop(1,    "rgba(232,68,10,0.65)");
     ctx.fillStyle = grad;
     ctx.fill();
