@@ -1,108 +1,91 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 interface StockSparklineProps {
   ticker: string;
   role: string;
 }
 
-function seedRandom(str: string): () => number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
-  }
-  return () => {
-    hash = (hash * 16807 + 0) % 2147483647;
-    return (hash & 0x7fffffff) / 0x7fffffff;
-  };
-}
-
-function generatePriceData(ticker: string, role: string): number[] {
-  const rng = seedRandom(ticker);
-  const points = 30;
-  const data: number[] = [100];
-  const drift = role === "BENEFICIARY" ? 0.002 : role === "HEADWIND" ? -0.002 : 0;
-  const volatility = role === "CANARY" ? 0.04 : 0.025;
-
-  for (let i = 1; i < points; i++) {
-    const change = drift + (rng() - 0.5) * volatility;
-    data.push(data[i - 1] * (1 + change));
-  }
-  return data;
-}
-
 export default function StockSparkline({ ticker, role }: StockSparklineProps) {
-  const [hovered, setHovered] = useState(false);
+  const [tooltip, setTooltip] = useState<string[] | null>(null);
 
-  const data = useMemo(() => generatePriceData(ticker, role), [ticker, role]);
+  const seed = ticker.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const rand = (i: number) => ((seed * (i + 1) * 2654435761) >>> 0) / 4294967295;
 
-  const last5Changes = useMemo(() => {
-    const changes: string[] = [];
-    for (let i = data.length - 5; i < data.length; i++) {
-      const pct = ((data[i] - data[i - 1]) / data[i - 1]) * 100;
-      changes.push(`${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`);
-    }
-    return changes;
-  }, [data]);
+  const points = Array.from({ length: 12 }, (_, i) => {
+    const noise = (rand(i) - 0.5) * 20;
+    const trend =
+      role === "BENEFICIARY" ? i * 2 :
+      role === "HEADWIND" ? i * -2 :
+      Math.sin(i) * 4;
+    return 40 + trend + noise;
+  });
 
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const min = Math.min(...points);
+  const max = Math.max(...points);
   const range = max - min || 1;
-  const w = 80;
+  const normalize = (v: number) => ((v - min) / range) * 28 + 2;
+
+  const w = 72;
   const h = 32;
-
-  const isUp = data[data.length - 1] > data[0];
-  const color = isUp ? "#FF4500" : "#5A5A5A";
-
-  const points = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * w;
-      const y = h - ((v - min) / range) * (h - 4) - 2;
-      return `${x},${y}`;
-    })
+  const step = w / (points.length - 1);
+  const pathD = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${i * step},${h - normalize(p)}`)
     .join(" ");
+
+  const pctChanges = points
+    .slice(-5)
+    .map((p, i, arr) =>
+      i === 0 ? null : ((p - arr[i - 1]) / arr[i - 1] * 100).toFixed(1)
+    )
+    .filter((v): v is string => v !== null);
+
+  const isUp = points[points.length - 1] > points[0];
+  const color = isUp ? "#FF4500" : "#5A5A5A";
 
   return (
     <div
-      className="relative"
-      style={{ width: w, maxWidth: w, overflow: "hidden" }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      style={{ position: "relative", width: 72, height: 32, flexShrink: 0 }}
+      onMouseEnter={() => setTooltip(pctChanges)}
+      onMouseLeave={() => setTooltip(null)}
     >
-      <svg width={w} height={h} style={{ display: "block" }}>
-        <polyline
-          points={points}
+      <svg width={72} height={32} style={{ overflow: "visible" }}>
+        <path
+          d={pathD}
           fill="none"
           stroke={color}
           strokeWidth={1.5}
+          strokeLinecap="round"
           strokeLinejoin="round"
         />
       </svg>
-
-      {hovered && (
+      {tooltip && (
         <div
           style={{
             position: "absolute",
-            bottom: "100%",
+            bottom: 36,
             right: 0,
             background: "#161616",
             border: "1px solid #242424",
-            padding: "4px 8px",
+            padding: "6px 10px",
+            fontSize: 10,
+            color: "#F0EDE8",
+            fontFamily: "JetBrains Mono, monospace",
             whiteSpace: "nowrap",
-            zIndex: 10,
-            marginBottom: "4px",
+            zIndex: 50,
+            pointerEvents: "none",
           }}
         >
-          <span
-            style={{
-              color: "#F0EDE8",
-              fontFamily: "JetBrains Mono, monospace",
-              fontSize: "10px",
-            }}
-          >
-            {last5Changes.join(" · ")}
-          </span>
+          {tooltip.map((v, i) => (
+            <div
+              key={i}
+              style={{ color: parseFloat(v) >= 0 ? "#FF4500" : "#5A5A5A" }}
+            >
+              {parseFloat(v) >= 0 ? "+" : ""}
+              {v}%
+            </div>
+          ))}
         </div>
       )}
     </div>
