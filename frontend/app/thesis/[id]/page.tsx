@@ -13,7 +13,6 @@ import TrashIcon from "@/components/TrashIcon";
 import {
   api,
   ThesisDetail,
-  Feed,
   Effect,
   ScoringBreakdown,
   EvidenceDimension,
@@ -23,10 +22,8 @@ export default function ThesisDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const [thesis, setThesis] = useState<ThesisDetail | null>(null);
-  const [feeds, setFeeds] = useState<Feed[]>([]);
   const [breakdown, setBreakdown] = useState<ScoringBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
-  const [feedsOpen, setFeedsOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [scoringOpen, setScoringOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"bets" | "startups">("bets");
@@ -44,12 +41,10 @@ export default function ThesisDetailPage() {
     if (!id) return;
     Promise.all([
       api.getThesis(id),
-      api.getFeeds(id),
       api.getScoringBreakdown(id),
     ])
-      .then(([t, f, b]) => {
+      .then(([t, b]) => {
         setThesis(t);
-        setFeeds(f);
         setBreakdown(b);
       })
       .catch(() => {})
@@ -96,14 +91,7 @@ export default function ThesisDetailPage() {
     setRefreshing(true);
     try {
       await api.refreshFeeds(id);
-      const [t, f, b] = await Promise.all([
-        api.getThesis(id),
-        api.getFeeds(id),
-        api.getScoringBreakdown(id),
-      ]);
-      setThesis(t);
-      setFeeds(f);
-      setBreakdown(b);
+      await reloadThesis();
     } catch (e) {
       console.error("Feed refresh failed:", e);
     } finally {
@@ -242,23 +230,41 @@ export default function ThesisDetailPage() {
           </div>
 
           {/* Collapsible scoring breakdown trigger */}
-          <button
-            onClick={() => setScoringOpen(!scoringOpen)}
-            className="uppercase flex items-center gap-2 mb-6"
-            style={{
-              color: "var(--text-muted)",
-              letterSpacing: "0.08em",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "13px",
-            }}
-          >
-            HOW IS THIS SCORED?{" "}
-            <span style={{ fontSize: "12px" }}>
-              {scoringOpen ? "▲" : "▾"}
-            </span>
-          </button>
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => setScoringOpen(!scoringOpen)}
+              className="uppercase flex items-center gap-2"
+              style={{
+                color: "var(--text-muted)",
+                letterSpacing: "0.08em",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "13px",
+              }}
+            >
+              HOW IS THIS SCORED?{" "}
+              <span style={{ fontSize: "12px" }}>
+                {scoringOpen ? "▲" : "▾"}
+              </span>
+            </button>
+            <button
+              onClick={handleRefreshFeeds}
+              disabled={refreshing}
+              className="uppercase px-3 py-1 border"
+              style={{
+                color: refreshing ? "var(--text-muted)" : "var(--accent)",
+                borderColor: refreshing ? "var(--border)" : "var(--accent)",
+                letterSpacing: "0.08em",
+                background: "none",
+                cursor: refreshing ? "not-allowed" : "pointer",
+                fontSize: "11px",
+                opacity: refreshing ? 0.5 : 1,
+              }}
+            >
+              {refreshing ? "REFRESHING..." : "REFRESH FEEDS"}
+            </button>
+          </div>
 
           {/* ══════════════════════════════════════════════════
               SECTION 2: SCORING BREAKDOWN (collapsible)
@@ -317,17 +323,6 @@ export default function ThesisDetailPage() {
               />
             </>
           )}
-
-          {/* ══════════════════════════════════════════════════
-              SECTION 4: FEEDS
-              ══════════════════════════════════════════════════ */}
-          <FeedPanel
-            feeds={feeds}
-            feedsOpen={feedsOpen}
-            setFeedsOpen={setFeedsOpen}
-            refreshing={refreshing}
-            onRefresh={handleRefreshFeeds}
-          />
 
           {/* ══════════════════════════════════════════════════
               SECTION 5: EFFECT THUMBNAILS
@@ -880,373 +875,6 @@ function TabButton({
     >
       {label}
     </button>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   FEED PANEL
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function formatFeedName(feed: Feed): string {
-  return feed.name.replace(/^(Fred|Gtrends|Alpha Vantage)\s+/i, "");
-}
-
-function formatRawValue(feed: Feed): string {
-  if (feed.rawValue == null) return "——";
-  const v = feed.rawValue;
-  if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}T`;
-  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
-  if (Number.isInteger(v)) return v.toString();
-  return v.toFixed(2);
-}
-
-function FeedPanel({
-  feeds,
-  feedsOpen,
-  setFeedsOpen,
-  refreshing,
-  onRefresh,
-}: {
-  feeds: Feed[];
-  feedsOpen: boolean;
-  setFeedsOpen: (v: boolean) => void;
-  refreshing: boolean;
-  onRefresh: () => void;
-}) {
-  const [expandedFeed, setExpandedFeed] = useState<string | null>(null);
-
-  const live = feeds.filter((f) => f.status === "live").length;
-  const offline = feeds.filter((f) => f.status === "offline").length;
-  const degraded = feeds.filter((f) => f.status === "degraded").length;
-  const stale = feeds.length - live - offline - degraded;
-
-  return (
-    <div className="mb-8">
-      <div className="flex items-center gap-4 mb-4">
-        <button
-          onClick={() => setFeedsOpen(!feedsOpen)}
-          className="uppercase flex items-center gap-2"
-          style={{
-            color: "var(--text-muted)",
-            letterSpacing: "0.08em",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "13px",
-          }}
-        >
-          FEEDS ({feeds.length})
-          <span style={{ fontSize: "12px" }}>{feedsOpen ? "▲" : "▾"}</span>
-        </button>
-
-        <button
-          onClick={onRefresh}
-          disabled={refreshing}
-          className="uppercase px-3 py-1 border"
-          style={{
-            color: refreshing ? "var(--text-muted)" : "var(--accent)",
-            borderColor: refreshing ? "var(--border)" : "var(--accent)",
-            letterSpacing: "0.08em",
-            background: "none",
-            cursor: refreshing ? "wait" : "pointer",
-            fontSize: "12px",
-            opacity: refreshing ? 0.6 : 1,
-          }}
-        >
-          {refreshing ? "FETCHING..." : "REFRESH ALL"}
-        </button>
-
-        {feedsOpen && (
-          <span
-            style={{
-              color: "var(--text-muted)",
-              fontFamily: "JetBrains Mono, monospace",
-              fontSize: "12px",
-            }}
-          >
-            {live} live / {stale} stale / {degraded} degraded / {offline}{" "}
-            offline
-          </span>
-        )}
-      </div>
-
-      {feedsOpen && (
-        <div className="border" style={{ borderColor: "var(--border)" }}>
-          <div
-            className="px-4 py-2 flex items-center gap-4"
-            style={{
-              background: "var(--bg)",
-              borderBottom: "1px solid var(--border)",
-            }}
-          >
-            <span style={{ width: "12px", flexShrink: 0 }} />
-            <span
-              className="flex-1 min-w-0 uppercase"
-              style={{
-                color: "var(--text-muted)",
-                letterSpacing: "0.08em",
-                fontSize: "11px",
-              }}
-            >
-              SOURCE / FEED NAME
-            </span>
-            <span
-              className="flex-shrink-0 uppercase"
-              style={{
-                color: "var(--text-muted)",
-                letterSpacing: "0.08em",
-                fontSize: "11px",
-                minWidth: "60px",
-                textAlign: "right",
-              }}
-            >
-              RAW
-            </span>
-            <span
-              className="flex-shrink-0 uppercase"
-              style={{
-                color: "var(--text-muted)",
-                letterSpacing: "0.08em",
-                fontSize: "11px",
-                minWidth: "50px",
-                textAlign: "right",
-              }}
-            >
-              SCORE
-            </span>
-            <span
-              className="flex-shrink-0 uppercase"
-              style={{
-                color: "var(--text-muted)",
-                letterSpacing: "0.08em",
-                fontSize: "11px",
-                minWidth: "60px",
-                textAlign: "right",
-              }}
-            >
-              STATUS
-            </span>
-          </div>
-          {feeds.map((feed, i) => {
-            const isExpanded = expandedFeed === feed.id;
-            const score =
-              feed.normalizedScore != null
-                ? Math.round(feed.normalizedScore)
-                : null;
-
-            return (
-              <div
-                key={feed.id}
-                style={{
-                  borderTop:
-                    i > 0 ? "1px solid var(--border)" : "none",
-                  background: "var(--surface)",
-                }}
-              >
-                <button
-                  onClick={() =>
-                    setExpandedFeed(isExpanded ? null : feed.id)
-                  }
-                  className="w-full px-4 py-3 flex items-center gap-4 text-left"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span
-                    style={{
-                      color: "var(--text-muted)",
-                      fontSize: "11px",
-                      width: "12px",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {isExpanded ? "−" : "+"}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <span
-                      style={{
-                        color: "var(--text)",
-                        fontSize: "14px",
-                        display: "block",
-                      }}
-                    >
-                      {formatFeedName(feed)}
-                    </span>
-                    <span
-                      style={{
-                        color: "#242424",
-                        fontSize: "11px",
-                        fontFamily: "JetBrains Mono, monospace",
-                      }}
-                    >
-                      {feed.seriesId || feed.keyword || feed.source}
-                    </span>
-                  </div>
-                  <span
-                    className="flex-shrink-0"
-                    style={{
-                      color: "var(--text)",
-                      fontFamily: "JetBrains Mono, monospace",
-                      fontSize: "13px",
-                      minWidth: "60px",
-                      textAlign: "right",
-                    }}
-                  >
-                    {formatRawValue(feed)}
-                  </span>
-                  <span
-                    className="flex-shrink-0"
-                    style={{
-                      color:
-                        score != null
-                          ? "var(--accent)"
-                          : "var(--text-muted)",
-                      fontFamily: "JetBrains Mono, monospace",
-                      fontSize: "13px",
-                      minWidth: "50px",
-                      textAlign: "right",
-                    }}
-                  >
-                    {score != null ? score : "——"}
-                  </span>
-                  <FeedStatusBadge status={feed.status} />
-                </button>
-                {isExpanded && (
-                  <div
-                    className="px-4 pb-3 pl-10"
-                    style={{ background: "var(--surface)" }}
-                  >
-                    <div
-                      className="grid grid-cols-2 gap-x-6 gap-y-2"
-                      style={{ maxWidth: "600px" }}
-                    >
-                      <div>
-                        <span
-                          className="uppercase block"
-                          style={{
-                            color: "#242424",
-                            letterSpacing: "0.08em",
-                            fontSize: "11px",
-                            marginBottom: "2px",
-                          }}
-                        >
-                          SOURCE
-                        </span>
-                        <span
-                          style={{
-                            color: "var(--text-muted)",
-                            fontSize: "13px",
-                          }}
-                        >
-                          {feed.source} — {feed.sourceType}
-                        </span>
-                      </div>
-                      <div>
-                        <span
-                          className="uppercase block"
-                          style={{
-                            color: "#242424",
-                            letterSpacing: "0.08em",
-                            fontSize: "11px",
-                            marginBottom: "2px",
-                          }}
-                        >
-                          DIRECTION
-                        </span>
-                        <span
-                          style={{
-                            color: "var(--text-muted)",
-                            fontSize: "13px",
-                          }}
-                        >
-                          {feed.confirmingDirection === "higher"
-                            ? "↑ Higher confirms"
-                            : "↓ Lower confirms"}
-                        </span>
-                      </div>
-                      <div>
-                        <span
-                          className="uppercase block"
-                          style={{
-                            color: "#242424",
-                            letterSpacing: "0.08em",
-                            fontSize: "11px",
-                            marginBottom: "2px",
-                          }}
-                        >
-                          WEIGHT
-                        </span>
-                        <span
-                          style={{
-                            color: "var(--text-muted)",
-                            fontFamily: "JetBrains Mono, monospace",
-                            fontSize: "13px",
-                          }}
-                        >
-                          {feed.weight.toFixed(2)}
-                        </span>
-                      </div>
-                      <div>
-                        <span
-                          className="uppercase block"
-                          style={{
-                            color: "#242424",
-                            letterSpacing: "0.08em",
-                            fontSize: "11px",
-                            marginBottom: "2px",
-                          }}
-                        >
-                          LAST FETCHED
-                        </span>
-                        <span
-                          style={{
-                            color: "var(--text-muted)",
-                            fontSize: "13px",
-                          }}
-                        >
-                          {feed.lastFetched
-                            ? new Date(feed.lastFetched).toLocaleString()
-                            : "——"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FeedStatusBadge({ status }: { status: string }) {
-  const config: Record<string, string> = {
-    live: "var(--status-live)",
-    stale: "var(--status-stale)",
-    degraded: "var(--status-degraded)",
-    offline: "var(--status-offline)",
-  };
-  const color = config[status] || config.stale;
-
-  return (
-    <span
-      className="uppercase flex-shrink-0"
-      style={{
-        color,
-        letterSpacing: "0.08em",
-        fontSize: "11px",
-        minWidth: "60px",
-        textAlign: "right",
-      }}
-    >
-      {status.toUpperCase()}
-    </span>
   );
 }
 

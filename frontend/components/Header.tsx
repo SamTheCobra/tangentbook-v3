@@ -11,10 +11,24 @@ interface HeaderProps {
 
 export default function Header({ onNewThesis }: HeaderProps) {
   const [macro, setMacro] = useState<MacroHeader | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     api.getMacroHeader().then(setMacro).catch((e) => console.error("Macro header fetch failed:", e));
   }, []);
+
+  const handleRefreshAll = async () => {
+    setRefreshing(true);
+    try {
+      await fetch("http://localhost:8000/api/feeds/refresh-all", { method: "POST" });
+      const freshMacro = await api.getMacroHeader();
+      setMacro(freshMacro);
+    } catch (e) {
+      console.error("Refresh failed:", e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <header
@@ -62,6 +76,23 @@ export default function Header({ onNewThesis }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-6">
+        <button
+          onClick={handleRefreshAll}
+          disabled={refreshing}
+          className="uppercase px-3 py-1.5 border"
+          style={{
+            color: refreshing ? "var(--text-muted)" : "var(--accent)",
+            borderColor: refreshing ? "var(--text-muted)" : "var(--accent)",
+            letterSpacing: "0.08em",
+            background: "none",
+            cursor: refreshing ? "not-allowed" : "pointer",
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontSize: "11px",
+            opacity: refreshing ? 0.5 : 1,
+          }}
+        >
+          {refreshing ? "REFRESHING..." : "REFRESH ALL FEEDS"}
+        </button>
         <ThemeToggle />
         {onNewThesis && (
           <button

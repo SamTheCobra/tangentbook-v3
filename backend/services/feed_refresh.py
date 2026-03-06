@@ -61,9 +61,8 @@ async def refresh_thesis_feeds(thesis_id: str, db: Session):
     else:
         evidence = thesis.evidence_score  # Keep existing when all feeds are down
 
-    # Momentum: simple comparison to previous evidence
-    prev_evidence = thesis.evidence_score
-    momentum = _compute_simple_momentum(evidence, prev_evidence)
+    # Momentum: use THI snapshot history for real deltas
+    momentum = _compute_momentum_from_snapshots(thesis_id, evidence, db)
 
     # Conviction from data quality
     live_feeds = total_feeds - len(offline_feeds)
@@ -131,6 +130,43 @@ async def _fetch_single_feed(feed: DataFeed, db: Session) -> dict | None:
     else:
         logger.debug(f"Skipping feed {feed.id} (source: {feed.source})")
         return None
+
+
+def _compute_momentum_from_snapshots(thesis_id: str, current_evidence: float, db: Session) -> float:
+    """Compute momentum from THI snapshot history using 30d/90d/1yr deltas."""
+    snapshots = (
+        db.query(THISnapshot)
+        .filter(THISnapshot.thesis_id == thesis_id)
+        .order_by(THISnapshot.computed_at.desc())
+        .all()
+    )
+    if len(snapshots) < 2:
+        return 50.0  # Neutral when insufficient history
+
+    now = datetime.utcnow()
+    max_delta = 30.0  # Points
+
+    def find_nearest(target_dt):
+        best = None
+        best_diff = None
+        for s in snapshots:
+            diff = abs((s.computed_at - target_dt).total_seconds())
+            if best_diff is None or diff < best_diff:
+                best = s
+                best_diff = diff
+        return best
+
+    def delta_to_score(snap):
+        if not snap or snap.evidence_score is None:
+            return 50.0
+        delta = current_evidence - snap.evidence_score
+        return clamp(round(50 + (delta / max_delta) * 50, 1))
+
+    s30 = delta_to_score(find_nearest(now - timedelta(days=30)))
+    s90 = delta_to_score(find_nearest(now - timedelta(days=90)))
+    s1y = delta_to_score(find_nearest(now - timedelta(days=365)))
+
+    return clamp(round(s30 * 0.50 + s90 * 0.30 + s1y * 0.20, 1))
 
 
 def _compute_simple_momentum(current: float, previous: float) -> float:

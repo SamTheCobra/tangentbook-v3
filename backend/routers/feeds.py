@@ -51,6 +51,18 @@ async def refresh_feeds(thesis_id: str, db: Session = Depends(get_db)):
     }
 
 
+@router.post("/feeds/refresh-all")
+async def refresh_all_feeds_endpoint(db: Session = Depends(get_db)):
+    """Refresh all thesis feeds and macro header."""
+    from services.feed_refresh import refresh_all_theses
+    await refresh_all_theses(db)
+    theses = db.query(Thesis).all()
+    return {
+        "status": "refreshed",
+        "theses": [{"id": t.id, "thiScore": t.thi_score} for t in theses],
+    }
+
+
 @router.post("/macro/refresh")
 async def refresh_macro(db: Session = Depends(get_db)):
     await refresh_macro_header(db)
