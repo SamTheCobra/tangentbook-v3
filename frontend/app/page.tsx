@@ -65,26 +65,6 @@ export default function Home() {
     return result;
   }, [theses, filter, sort, tagFilter]);
 
-  const handleCollapse = async (id: string) => {
-    await api.toggleCollapse(id);
-    setTheses((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, isCollapsed: !t.isCollapsed } : t))
-    );
-  };
-
-  const handleArchive = async (id: string) => {
-    await api.toggleArchive(id);
-    setTheses((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, isArchived: !t.isArchived } : t))
-    );
-  };
-
-  const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
-    await api.deleteThesis(id);
-    setTheses((prev) => prev.filter((t) => t.id !== id));
-  };
-
   return (
     <ErrorBoundary>
     <main className="min-h-screen" style={{ background: "var(--bg)" }}>
@@ -185,13 +165,7 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0">
               {filtered.map((thesis) => (
-                <ThesisCard
-                  key={thesis.id}
-                  thesis={thesis}
-                  onCollapse={() => handleCollapse(thesis.id)}
-                  onArchive={() => handleArchive(thesis.id)}
-                  onDelete={() => handleDelete(thesis.id, thesis.title)}
-                />
+                <ThesisCard key={thesis.id} thesis={thesis} />
               ))}
             </div>
           </div>
@@ -202,188 +176,41 @@ export default function Home() {
   );
 }
 
-function ThesisCard({
-  thesis,
-  onCollapse,
-  onArchive,
-  onDelete,
-}: {
-  thesis: Thesis;
-  onCollapse: () => void;
-  onArchive: () => void;
-  onDelete: () => void;
-}) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  if (thesis.isCollapsed) {
-    return (
-      <div
-        className="border px-5 py-3 flex items-center justify-between"
-        style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-      >
-        <div className="flex items-center gap-4 flex-1 min-w-0">
-          <Link
-            href={`/thesis/${thesis.id}`}
-            className="font-bold uppercase hover:underline"
-            style={{ color: "var(--text)", letterSpacing: "-0.03em", textUnderlineOffset: "3px", fontSize: "14px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-          >
-            {thesis.title}
-          </Link>
-        </div>
-        <div className="flex items-center gap-4 ml-4">
-          <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
-            {Math.round(thesis.thi.score)}
-          </span>
-          <button
-            onClick={onCollapse}
-            style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
-          >
-            +
-          </button>
-        </div>
-      </div>
-    );
-  }
+function ThesisCard({ thesis }: { thesis: Thesis }) {
+  const [hovered, setHovered] = useState(false);
 
   return (
-    <div
-      className="border p-5 relative flex flex-col"
-      style={{ background: "var(--surface)", borderColor: "var(--border)", minHeight: "220px" }}
+    <Link
+      href={`/thesis/${thesis.id}`}
+      className="block"
+      style={{
+        background: "#1A1A1A",
+        border: `1px solid ${hovered ? "#E8440A" : "#2A2A2A"}`,
+        padding: "24px",
+        minHeight: "140px",
+        textDecoration: "none",
+        transition: "border-color 0.15s ease",
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {/* Top: title + needle */}
-      <div className="flex items-start justify-between">
-        <div className="flex-1 mr-4 overflow-hidden">
-          <div className="flex items-start justify-between">
-            <Link
-              href={`/thesis/${thesis.id}`}
-              className="font-bold uppercase hover:underline"
-              style={{
-                color: "var(--text)",
-                letterSpacing: "-0.03em",
-                lineHeight: "1.3",
-                textUnderlineOffset: "3px",
-                fontSize: "15px",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {thesis.title}
-            </Link>
-            <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-              <button
-                onClick={onCollapse}
-                className="px-1"
-                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
-              >
-                —
-              </button>
-              <div className="relative">
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="px-1"
-                  style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
-                >
-                  ...
-                </button>
-                {menuOpen && (
-                  <div
-                    className="absolute right-0 top-5 z-10 border py-1"
-                    style={{ background: "var(--surface-alt)", borderColor: "var(--border)", minWidth: "140px" }}
-                  >
-                    <button
-                      onClick={() => { onArchive(); setMenuOpen(false); }}
-                      className="block w-full text-left px-3 py-1.5 uppercase"
-                      style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", letterSpacing: "0.08em", fontSize: "12px" }}
-                    >
-                      {thesis.isArchived ? "Unarchive" : "Archive thesis"}
-                    </button>
-                    <button
-                      onClick={() => { onDelete(); setMenuOpen(false); }}
-                      className="block w-full text-left px-3 py-1.5 uppercase"
-                      style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", letterSpacing: "0.08em", fontSize: "12px" }}
-                    >
-                      Delete thesis
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          <p
-            className="mt-2"
-            style={{
-              color: "var(--text-muted)",
-              lineHeight: "1.5",
-              fontSize: "14px",
-              display: "-webkit-box",
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {thesis.subtitle}
-          </p>
+      <div className="flex items-center gap-4">
+        <h2
+          className="flex-1 font-bold uppercase"
+          style={{
+            color: "#F5F3EE",
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontSize: "18px",
+            letterSpacing: "-0.03em",
+            lineHeight: "1.3",
+          }}
+        >
+          {thesis.title}
+        </h2>
+        <div className="flex-shrink-0">
+          <Needle score={thesis.thi.score} size="sm" />
         </div>
-        <Needle score={thesis.thi.score} size="sm" />
       </div>
-
-      {/* Spacer to push bottom content down */}
-      <div className="flex-1" />
-
-      {/* Bottom: conviction + tickers + horizon */}
-      <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
-        <div className="flex items-center gap-2 flex-wrap" style={{ fontSize: "13px" }}>
-          <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
-            CONVICTION
-          </span>
-          <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
-            {thesis.userConviction.score}/10
-          </span>
-          <span style={{ color: "var(--border)", margin: "0 2px" }}>·</span>
-          {thesis.equityBets.slice(0, 3).map((bet) => (
-            <span
-              key={bet.id}
-              style={{
-                color: bet.role === "BENEFICIARY" ? "var(--positive)" : bet.role === "HEADWIND" ? "var(--text-muted)" : "var(--accent)",
-                fontFamily: "JetBrains Mono, monospace",
-                fontSize: "13px",
-              }}
-            >
-              {bet.ticker}
-            </span>
-          ))}
-          <span style={{ color: "var(--border)", margin: "0 2px" }}>·</span>
-          <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
-            {thesis.timeHorizon}
-          </span>
-        </div>
-
-        {thesis.userConviction.divergenceWarning && (
-          <div
-            className="mt-2 px-2 py-1 border"
-            style={{ borderColor: "var(--accent)", color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}
-          >
-            {thesis.userConviction.divergenceWarning}
-          </div>
-        )}
-      </div>
-
-      {/* Tags */}
-      {thesis.tags.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {thesis.tags.map((tag) => (
-            <span
-              key={tag}
-              className="uppercase px-2 py-0.5 border"
-              style={{ color: "var(--text-muted)", borderColor: "var(--border)", letterSpacing: "0.08em", fontSize: "11px" }}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
+    </Link>
   );
 }
