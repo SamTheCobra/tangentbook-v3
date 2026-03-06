@@ -34,7 +34,7 @@ SEED_DATA = [
         "equityBets": [
             {"ticker": "GLD", "companyName": "SPDR Gold Shares", "companyDescription": "Largest physically-backed gold ETF tracking the price of gold bullion. Direct hedge against dollar debasement and monetary expansion.", "role": "BENEFICIARY", "rationale": "Gold ETF is the cleanest direct expression of dollar debasement thesis.", "isFeedbackIndicator": True, "feedbackWeight": 0.10},
             {"ticker": "MSTR", "companyName": "MicroStrategy", "companyDescription": "Enterprise software company that converted its balance sheet into a Bitcoin treasury. Largest corporate holder of Bitcoin globally.", "role": "BENEFICIARY", "rationale": "Bitcoin proxy with leverage — amplified expression of hard money flight.", "isFeedbackIndicator": True, "feedbackWeight": 0.08},
-            {"ticker": "NEM", "companyName": "Newmont Corporation", "companyDescription": "World's largest gold mining company operating mines across five continents. Revenue and margins expand with rising gold prices.", "role": "BENEFICIARY", "rationale": "Gold miner with operating leverage — outperforms gold itself in a bull run.", "isFeedbackIndicator": False}
+            {"ticker": "FCX", "companyName": "Freeport-McMoRan", "companyDescription": "World's largest publicly traded copper producer. Copper is a critical industrial commodity whose price rises with inflation and infrastructure spending.", "role": "CANARY", "rationale": "Copper prices signal real-asset demand and industrial inflation — different commodity angle from gold.", "isFeedbackIndicator": True, "feedbackWeight": 0.06}
         ],
         "startupOpportunities": [
             {"name": "AurusPay", "oneLiner": "B2B payment rails denominated in tokenized gold for SMBs in high-inflation countries.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"},
@@ -151,9 +151,9 @@ SEED_DATA = [
             {"id": "gtrends_hyperscaler_capex", "source": "GTRENDS", "keyword": "Microsoft Azure AWS Google Cloud infrastructure spending", "sourceType": "flow", "confirmingDirection": "higher"}
         ],
         "equityBets": [
-            {"ticker": "NEE", "companyName": "NextEra Energy", "companyDescription": "Largest US electric utility and world's largest generator of wind and solar energy. Powers major datacenter corridors.", "role": "BENEFICIARY", "rationale": "Power infrastructure — AI datacenters need massive baseload electricity.", "isFeedbackIndicator": True, "feedbackWeight": 0.09},
-            {"ticker": "SO", "companyName": "Southern Company", "companyDescription": "Major US utility with nuclear, gas, and renewable generation. Serves the Southeast datacenter corridor.", "role": "BENEFICIARY", "rationale": "Southern Company — nuclear and gas power for Southeast datacenter corridor.", "isFeedbackIndicator": False},
-            {"ticker": "DUK", "companyName": "Duke Energy", "companyDescription": "One of America's largest electric utilities serving the Carolinas and Midwest. Major grid infrastructure operator.", "role": "BENEFICIARY", "rationale": "Duke Energy — another major power utility in prime datacenter geography.", "isFeedbackIndicator": False}
+            {"ticker": "VRT", "companyName": "Vertiv Holdings", "companyDescription": "Leading provider of power management and thermal management solutions for datacenters. Makes the cooling and power distribution equipment AI facilities require.", "role": "BENEFICIARY", "rationale": "Physical datacenter infrastructure — every AI rack needs Vertiv's cooling and power systems.", "isFeedbackIndicator": True, "feedbackWeight": 0.09},
+            {"ticker": "ANET", "companyName": "Arista Networks", "companyDescription": "Dominant provider of high-speed datacenter networking switches. Powers the internal networks of hyperscaler AI clusters.", "role": "CANARY", "rationale": "Datacenter networking spend signals AI infrastructure buildout velocity.", "isFeedbackIndicator": True, "feedbackWeight": 0.07},
+            {"ticker": "NEE", "companyName": "NextEra Energy", "companyDescription": "Largest US electric utility and world's largest generator of wind and solar energy. Powers major datacenter corridors.", "role": "BENEFICIARY", "rationale": "Power generation — AI datacenters need massive baseload electricity from renewables.", "isFeedbackIndicator": False}
         ],
         "startupOpportunities": [
             {"name": "CoolCore", "oneLiner": "Liquid cooling-as-a-service for retrofitting existing datacenters to AI workloads.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"},
@@ -207,8 +207,9 @@ SEED_DATA = [
             {"id": "gtrends_bootcamp", "source": "GTRENDS", "keyword": "coding bootcamp trade school", "sourceType": "adoption", "confirmingDirection": "higher"}
         ],
         "equityBets": [
-            {"ticker": "CHGG", "companyName": "Chegg", "companyDescription": "Education technology company pivoting from homework help to AI-powered adult learning and reskilling platform.", "role": "BENEFICIARY", "rationale": "Chegg pivoting to adult reskilling — direct bet on career chapter thesis.", "isFeedbackIndicator": True, "feedbackWeight": 0.08},
-            {"ticker": "STRA", "companyName": "Strategic Education", "companyDescription": "Operates Strayer University and Capella University focused on working adult education and vocational training.", "role": "BENEFICIARY", "rationale": "Strategic Education — vocational and workforce training focus.", "isFeedbackIndicator": False}
+            {"ticker": "COUR", "companyName": "Coursera", "companyDescription": "Leading online learning platform partnering with 300+ universities and companies. Offers degrees, certificates, and professional courses for career changers.", "role": "BENEFICIARY", "rationale": "Online reskilling platform — direct beneficiary of career chapter transitions.", "isFeedbackIndicator": True, "feedbackWeight": 0.08},
+            {"ticker": "UPWK", "companyName": "Upwork", "companyDescription": "Largest global freelancing marketplace connecting businesses with independent talent. Revenue grows as careers fragment into gig-based chapters.", "role": "BENEFICIARY", "rationale": "Talent marketplace — captures the demand side as reskilled workers find new gig-based roles.", "isFeedbackIndicator": False},
+            {"ticker": "LOPE", "companyName": "Grand Canyon Education", "companyDescription": "Operates Grand Canyon University, a major private university. Traditional degree model faces disruption from micro-credentials and bootcamps.", "role": "HEADWIND", "rationale": "Traditional 4-year degree model gets disrupted as employers accept bootcamp certs and micro-credentials.", "isFeedbackIndicator": True, "feedbackWeight": 0.06}
         ],
         "startupOpportunities": [
             {"name": "ChapterAI", "oneLiner": "AI career coach that maps your current skills to the highest-paying adjacent roles.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"},
@@ -270,9 +271,9 @@ SEED_DATA = [
             {"id": "fred_grid_investment", "source": "FRED", "seriesId": "IPG2211A2N", "sourceType": "structural", "confirmingDirection": "higher"}
         ],
         "equityBets": [
-            {"ticker": "NEE", "companyName": "NextEra Energy", "companyDescription": "Largest US electric utility and world's largest generator of wind and solar energy.", "role": "BENEFICIARY", "rationale": "NextEra — largest US utility with massive renewables pipeline.", "isFeedbackIndicator": True, "feedbackWeight": 0.10},
-            {"ticker": "SO", "companyName": "Southern Company", "companyDescription": "Major US utility with nuclear, gas, and renewable generation serving the Southeast.", "role": "BENEFICIARY", "rationale": "Southern Company — nuclear and gas in prime AI datacenter geography.", "isFeedbackIndicator": False},
-            {"ticker": "ETR", "companyName": "Entergy Corporation", "companyDescription": "Electric utility serving the Gulf South region with nuclear and gas generation.", "role": "CANARY", "rationale": "Entergy transmission capex signals how urgently utilities are upgrading.", "isFeedbackIndicator": False}
+            {"ticker": "CEG", "companyName": "Constellation Energy", "companyDescription": "Largest US nuclear fleet operator with 13 nuclear plants. Nuclear is the only viable baseload option at datacenter scale.", "role": "BENEFICIARY", "rationale": "Nuclear power — the only scalable carbon-free baseload for grid bottleneck. Shuttered plants getting restarted.", "isFeedbackIndicator": True, "feedbackWeight": 0.10},
+            {"ticker": "GNRC", "companyName": "Generac Holdings", "companyDescription": "Leading manufacturer of backup power generation equipment. Grid instability drives demand for residential and commercial backup power.", "role": "BENEFICIARY", "rationale": "Grid bottlenecks = blackouts and instability = massive demand for backup power.", "isFeedbackIndicator": False},
+            {"ticker": "ETR", "companyName": "Entergy Corporation", "companyDescription": "Electric utility serving the Gulf South region with nuclear and gas generation.", "role": "CANARY", "rationale": "Entergy transmission capex signals how urgently utilities are upgrading the grid.", "isFeedbackIndicator": True, "feedbackWeight": 0.06}
         ],
         "startupOpportunities": [
             {"name": "GridOS", "oneLiner": "Software layer for utility demand forecasting that accounts for AI datacenter load profiles.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"},
@@ -323,8 +324,8 @@ SEED_DATA = [
             {"id": "gtrends_trust_media", "source": "GTRENDS", "keyword": "trust media news authenticity", "sourceType": "adoption", "confirmingDirection": "higher"}
         ],
         "equityBets": [
-            {"ticker": "NFLX", "companyName": "Netflix", "companyDescription": "World's largest streaming platform with 260M+ subscribers. Invests $17B+/year in original human-created content.", "role": "BENEFICIARY", "rationale": "Premium human-curated content becomes more valuable vs. AI slop.", "isFeedbackIndicator": False},
-            {"ticker": "SPOT", "companyName": "Spotify Technology", "companyDescription": "Leading audio streaming platform with 600M+ users. Curates human-created music, podcasts, and audiobooks.", "role": "BENEFICIARY", "rationale": "Human artist discovery and curation becomes a competitive moat.", "isFeedbackIndicator": False},
+            {"ticker": "LYV", "companyName": "Live Nation Entertainment", "companyDescription": "World's largest live entertainment company operating Ticketmaster and 200+ venues. Live events are inherently human and unfakeable.", "role": "BENEFICIARY", "rationale": "Live experiences are the anti-AI-slop — you can't fake a concert. Premium on in-person skyrockets.", "isFeedbackIndicator": True, "feedbackWeight": 0.08},
+            {"ticker": "ETSY", "companyName": "Etsy", "companyDescription": "Global marketplace for handmade, vintage, and craft goods. 90M+ active buyers seeking authentic human-made products.", "role": "BENEFICIARY", "rationale": "Handmade marketplace — human provenance becomes a premium label as AI floods mass production.", "isFeedbackIndicator": False},
             {"ticker": "NYT", "companyName": "The New York Times", "companyDescription": "Premier subscription journalism brand with 10M+ digital subscribers. Gold standard for verified human reporting.", "role": "BENEFICIARY", "rationale": "Trusted human journalism becomes scarce and subscription-worthy.", "isFeedbackIndicator": True, "feedbackWeight": 0.08}
         ],
         "startupOpportunities": [
@@ -389,7 +390,7 @@ SEED_DATA = [
         ],
         "equityBets": [
             {"ticker": "WELL", "companyName": "Welltower", "companyDescription": "Largest healthcare REIT specializing in senior housing and post-acute care facilities across US, UK, and Canada.", "role": "BENEFICIARY", "rationale": "Welltower — largest senior housing REIT, direct demographic play.", "isFeedbackIndicator": True, "feedbackWeight": 0.10},
-            {"ticker": "VTR", "companyName": "Ventas", "companyDescription": "Diversified healthcare REIT owning senior housing, medical office buildings, and life science properties.", "role": "BENEFICIARY", "rationale": "Ventas — diversified healthcare REIT with senior housing focus.", "isFeedbackIndicator": False},
+            {"ticker": "ENSG", "companyName": "The Ensign Group", "companyDescription": "Largest independent operator of skilled nursing and senior living facilities in the US with 300+ facilities. Operator, not landlord.", "role": "BENEFICIARY", "rationale": "Skilled nursing operator — different from REIT landlord. Captures the care delivery side of senior boom.", "isFeedbackIndicator": False},
             {"ticker": "UNH", "companyName": "UnitedHealth Group", "companyDescription": "Largest US health insurer and healthcare services company. Medicare Advantage is its fastest-growing segment.", "role": "BENEFICIARY", "rationale": "UnitedHealth Medicare Advantage benefits from aging population.", "isFeedbackIndicator": False}
         ],
         "startupOpportunities": [
@@ -441,8 +442,9 @@ SEED_DATA = [
             {"id": "gtrends_stanley_cup", "source": "GTRENDS", "keyword": "stanley cup water bottle viral", "sourceType": "adoption", "confirmingDirection": "higher"}
         ],
         "equityBets": [
-            {"ticker": "ELF", "companyName": "e.l.f. Beauty", "companyDescription": "Fast-growing affordable cosmetics brand. $8 lip gloss that performs like $40 luxury — poster child of the micro-luxury trend.", "role": "BENEFICIARY", "rationale": "e.l.f. Beauty is the canonical micro-luxury brand.", "isFeedbackIndicator": True, "feedbackWeight": 0.12},
-            {"ticker": "ULTA", "companyName": "Ulta Beauty", "companyDescription": "Largest US beauty retailer with 1,300+ stores carrying both prestige and mass-market brands.", "role": "BENEFICIARY", "rationale": "Ulta democratizes beauty across price points.", "isFeedbackIndicator": False}
+            {"ticker": "ELF", "companyName": "e.l.f. Beauty", "companyDescription": "Fast-growing affordable cosmetics brand. $8 lip gloss that performs like $40 luxury — poster child of the micro-luxury trend.", "role": "BENEFICIARY", "rationale": "e.l.f. Beauty is the canonical micro-luxury brand — affordable beauty.", "isFeedbackIndicator": True, "feedbackWeight": 0.12},
+            {"ticker": "BIRK", "companyName": "Birkenstock", "companyDescription": "250-year-old German sandal brand that became a Gen Z status symbol. $150 sandals = affordable premium footwear.", "role": "BENEFICIARY", "rationale": "Affordable premium footwear — different sector from beauty, same micro-luxury thesis.", "isFeedbackIndicator": False},
+            {"ticker": "DUOL", "companyName": "Duolingo", "companyDescription": "Gamified language learning app with 100M+ monthly users. $7/month subscription = micro-investment in self-improvement.", "role": "BENEFICIARY", "rationale": "Micro-investment in skills — affordable self-improvement as a luxury purchase.", "isFeedbackIndicator": False}
         ],
         "startupOpportunities": [
             {"name": "CrateJoy 2.0", "oneLiner": "Micro-luxury subscription boxes curated around specific identities.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"},
@@ -493,8 +495,9 @@ SEED_DATA = [
             {"id": "gtrends_magnesium_sleep", "source": "GTRENDS", "keyword": "magnesium supplement sleep", "sourceType": "adoption", "confirmingDirection": "higher"}
         ],
         "equityBets": [
-            {"ticker": "AAPL", "companyName": "Apple", "companyDescription": "World's most valuable company. Apple Watch has become the leading consumer sleep tracker with health monitoring.", "role": "BENEFICIARY", "rationale": "Apple Watch sleep tracking integration accelerates mainstream adoption.", "isFeedbackIndicator": False},
-            {"ticker": "TPX", "companyName": "Tempur Sealy International", "companyDescription": "World's largest mattress company owning Tempur-Pedic, Sealy, and Stearns & Foster premium sleep brands.", "role": "BENEFICIARY", "rationale": "Tempur-Sealy is the premium mattress brand that benefits most.", "isFeedbackIndicator": True, "feedbackWeight": 0.10}
+            {"ticker": "AAPL", "companyName": "Apple", "companyDescription": "World's most valuable company. Apple Watch has become the leading consumer sleep tracker with health monitoring.", "role": "BENEFICIARY", "rationale": "Apple Watch sleep tracking — wearable tech angle on sleep optimization.", "isFeedbackIndicator": False},
+            {"ticker": "TPX", "companyName": "Tempur Sealy International", "companyDescription": "World's largest mattress company owning Tempur-Pedic, Sealy, and Stearns & Foster premium sleep brands.", "role": "BENEFICIARY", "rationale": "Premium mattress brand — physical sleep hardware angle.", "isFeedbackIndicator": True, "feedbackWeight": 0.10},
+            {"ticker": "MNST", "companyName": "Monster Beverage", "companyDescription": "Leading energy drink company with Monster, Reign, and Bang brands. Energy drink culture directly opposes the sleep-as-status movement.", "role": "HEADWIND", "rationale": "Energy drink demand declines as sleep becomes a status symbol and caffeine gets vilified.", "isFeedbackIndicator": True, "feedbackWeight": 0.06}
         ],
         "startupOpportunities": [
             {"name": "SleepScore Pro", "oneLiner": "Professional sleep assessment service — think dentist for your sleep.", "timing": "RIGHT_TIMING", "timeHorizon": "1-3yr"},
@@ -609,9 +612,9 @@ SEED_DATA = [
             {"id": "gtrends_phone_free_schools", "source": "GTRENDS", "keyword": "phone free school policy", "sourceType": "policy", "confirmingDirection": "higher"}
         ],
         "equityBets": [
-            {"ticker": "META", "companyName": "Meta Platforms", "companyDescription": "Parent of Facebook, Instagram, and WhatsApp. Revenue depends on user engagement and time-on-platform metrics.", "role": "HEADWIND", "rationale": "Meta engagement metrics are the canary — declining time-on-platform confirms thesis.", "isFeedbackIndicator": True, "feedbackWeight": 0.10},
-            {"ticker": "SNAP", "companyName": "Snap Inc.", "companyDescription": "Parent of Snapchat, the ephemeral messaging app popular with teens and young adults.", "role": "HEADWIND", "rationale": "Most vulnerable to anti-addiction backlash among young users.", "isFeedbackIndicator": False},
-            {"ticker": "GOOGL", "companyName": "Alphabet", "companyDescription": "Parent of Google, YouTube, and DeepMind. 80%+ of revenue from advertising tied to user attention.", "role": "CANARY", "rationale": "Google search volume decline signals attention shift.", "isFeedbackIndicator": False}
+            {"ticker": "META", "companyName": "Meta Platforms", "companyDescription": "Parent of Facebook, Instagram, and WhatsApp. Revenue depends on user engagement and time-on-platform metrics.", "role": "CANARY", "rationale": "Meta engagement metrics are the canary — declining time-on-platform confirms anti-addiction thesis.", "isFeedbackIndicator": True, "feedbackWeight": 0.10},
+            {"ticker": "SNAP", "companyName": "Snap Inc.", "companyDescription": "Parent of Snapchat, the ephemeral messaging app popular with teens and young adults.", "role": "HEADWIND", "rationale": "Most vulnerable pure-play social app to anti-addiction regulation targeting youth.", "isFeedbackIndicator": False},
+            {"ticker": "GRMN", "companyName": "Garmin", "companyDescription": "Leading maker of GPS devices, fitness wearables, and outdoor recreation electronics. Benefits as people swap screen time for outdoor activities.", "role": "BENEFICIARY", "rationale": "Outdoor fitness hardware — anti-screen beneficiary from a completely different sector.", "isFeedbackIndicator": False}
         ],
         "startupOpportunities": [
             {"name": "ClearMind", "oneLiner": "Subscription service that coaches families through digital minimalism.", "timing": "RIGHT_TIMING", "timeHorizon": "0-6mo"},
