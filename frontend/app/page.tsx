@@ -104,7 +104,6 @@ export default function Home() {
           </div>
         ) : (
           <div>
-            {/* Controls bar */}
             <div className="flex items-start justify-between mb-6">
               <div>
                 <div className="flex items-center gap-4 mb-3">
@@ -226,7 +225,7 @@ function ThesisCard({
           <Link
             href={`/thesis/${thesis.id}`}
             className="font-bold uppercase hover:underline"
-            style={{ color: "var(--text)", letterSpacing: "-0.03em", textUnderlineOffset: "3px", fontSize: "14px" }}
+            style={{ color: "var(--text)", letterSpacing: "-0.03em", textUnderlineOffset: "3px", fontSize: "14px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
           >
             {thesis.title}
           </Link>
@@ -248,16 +247,27 @@ function ThesisCard({
 
   return (
     <div
-      className="border p-5 relative"
-      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+      className="border p-5 relative flex flex-col"
+      style={{ background: "var(--surface)", borderColor: "var(--border)", minHeight: "220px" }}
     >
+      {/* Top: title + needle */}
       <div className="flex items-start justify-between">
-        <div className="flex-1 mr-4">
+        <div className="flex-1 mr-4 overflow-hidden">
           <div className="flex items-start justify-between">
             <Link
               href={`/thesis/${thesis.id}`}
               className="font-bold uppercase hover:underline"
-              style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", textUnderlineOffset: "3px", fontSize: "15px" }}
+              style={{
+                color: "var(--text)",
+                letterSpacing: "-0.03em",
+                lineHeight: "1.3",
+                textUnderlineOffset: "3px",
+                fontSize: "15px",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
             >
               {thesis.title}
             </Link>
@@ -301,40 +311,53 @@ function ThesisCard({
               </div>
             </div>
           </div>
-          <p className="mt-2" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
+          <p
+            className="mt-2"
+            style={{
+              color: "var(--text-muted)",
+              lineHeight: "1.5",
+              fontSize: "14px",
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
             {thesis.subtitle}
           </p>
         </div>
         <Needle score={thesis.thi.score} size="sm" />
       </div>
 
+      {/* Spacer to push bottom content down */}
+      <div className="flex-1" />
+
+      {/* Bottom: conviction + tickers + horizon */}
       <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
-              CONVICTION
+        <div className="flex items-center gap-2 flex-wrap" style={{ fontSize: "13px" }}>
+          <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
+            CONVICTION
+          </span>
+          <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
+            {thesis.userConviction.score}/10
+          </span>
+          <span style={{ color: "var(--border)", margin: "0 2px" }}>·</span>
+          {thesis.equityBets.slice(0, 3).map((bet) => (
+            <span
+              key={bet.id}
+              style={{
+                color: bet.role === "BENEFICIARY" ? "var(--positive)" : bet.role === "HEADWIND" ? "var(--text-muted)" : "var(--accent)",
+                fontFamily: "JetBrains Mono, monospace",
+                fontSize: "13px",
+              }}
+            >
+              {bet.ticker}
             </span>
-            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
-              {thesis.userConviction.score}/10
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            {thesis.equityBets.slice(0, 3).map((bet) => (
-              <span
-                key={bet.id}
-                style={{
-                  color: bet.role === "BENEFICIARY" ? "var(--positive)" : bet.role === "HEADWIND" ? "var(--text-muted)" : "var(--accent)",
-                  fontFamily: "JetBrains Mono, monospace",
-                  fontSize: "13px",
-                }}
-              >
-                {bet.ticker}
-              </span>
-            ))}
-            <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
-              {thesis.timeHorizon}
-            </span>
-          </div>
+          ))}
+          <span style={{ color: "var(--border)", margin: "0 2px" }}>·</span>
+          <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
+            {thesis.timeHorizon}
+          </span>
         </div>
 
         {thesis.userConviction.divergenceWarning && (
@@ -347,6 +370,7 @@ function ThesisCard({
         )}
       </div>
 
+      {/* Tags */}
       {thesis.tags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {thesis.tags.map((tag) => (

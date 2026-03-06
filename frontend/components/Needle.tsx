@@ -7,11 +7,7 @@ interface NeedleProps {
   size?: "sm" | "md" | "lg";
   label?: string;
   animated?: boolean;
-  breakdown?: {
-    evidence?: { score: number; weight: number };
-    momentum?: { score: number; weight: number };
-    conviction?: { score: number; weight: number };
-  };
+  formulaText?: string;
 }
 
 const SIZES = {
@@ -25,14 +21,13 @@ function getComputedCSSVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-export default function Needle({ score, size = "md", label = "THI", animated = true, breakdown }: NeedleProps) {
+export default function Needle({ score, size = "md", label = "THI", animated = true, formulaText }: NeedleProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [displayScore, setDisplayScore] = useState(animated ? 0 : score);
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const prevScoreRef = useRef(0);
 
-  // Animate score on mount and when score changes
   useEffect(() => {
     if (!animated) {
       setDisplayScore(score);
@@ -46,9 +41,8 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     const animate = (timestamp: number) => {
       if (!startTimeRef.current) startTimeRef.current = timestamp;
       const elapsed = timestamp - startTimeRef.current;
-      const duration = 1200; // 1.2s linear
+      const duration = 1200;
       const progress = Math.min(elapsed / duration, 1);
-
       const current = from + (to - from) * progress;
       setDisplayScore(current);
 
@@ -60,17 +54,14 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     };
 
     animationRef.current = requestAnimationFrame(animate);
-
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
   }, [score, animated]);
 
-  // Draw canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -80,41 +71,26 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     canvas.height = cfg.height * dpr;
     ctx.scale(dpr, dpr);
 
-    // Read CSS vars
     const muted = getComputedCSSVar("--text-muted") || "#8A8580";
     const accent = getComputedCSSVar("--accent") || "#E8440A";
-    const surfaceAlt = getComputedCSSVar("--surface-alt") || "#2A2723";
 
-    // Clear
     ctx.clearRect(0, 0, cfg.width, cfg.height);
 
     const cx = cfg.width / 2;
     const cy = cfg.height * 0.72;
     const radius = cfg.needleLen + 8;
 
-    // Zone colors (very low opacity)
-    const zones = [
-      { start: Math.PI, end: Math.PI * 1.2, color: "rgba(200, 80, 80, 0.06)" },
-      { start: Math.PI * 1.2, end: Math.PI * 1.4, color: "rgba(200, 140, 80, 0.06)" },
-      { start: Math.PI * 1.4, end: Math.PI * 1.6, color: "rgba(200, 200, 100, 0.06)" },
-      { start: Math.PI * 1.6, end: Math.PI * 1.8, color: "rgba(140, 200, 120, 0.06)" },
-      { start: Math.PI * 1.8, end: Math.PI * 2, color: "rgba(100, 180, 100, 0.06)" },
-    ];
-
-    // Draw arc zones
-    for (const zone of zones) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, zone.start, zone.end);
-      ctx.lineTo(cx, cy);
-      ctx.closePath();
-      ctx.fillStyle = zone.color;
-      ctx.fill();
-    }
-
-    // Draw arc outline
+    // Single-color arc — very dark, barely visible
     ctx.beginPath();
     ctx.arc(cx, cy, radius, Math.PI, Math.PI * 2);
-    ctx.strokeStyle = surfaceAlt;
+    ctx.strokeStyle = "#1E1B18";
+    ctx.lineWidth = cfg.strokeWidth + 4;
+    ctx.stroke();
+
+    // Arc outline
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, Math.PI, Math.PI * 2);
+    ctx.strokeStyle = "#2A2723";
     ctx.lineWidth = cfg.strokeWidth;
     ctx.stroke();
 
@@ -126,7 +102,7 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
       ctx.beginPath();
       ctx.moveTo(cx + tickInner * Math.cos(angle), cy + tickInner * Math.sin(angle));
       ctx.lineTo(cx + tickOuter * Math.cos(angle), cy + tickOuter * Math.sin(angle));
-      ctx.strokeStyle = i % 5 === 0 ? muted : surfaceAlt;
+      ctx.strokeStyle = i % 5 === 0 ? muted : "#2A2723";
       ctx.lineWidth = i % 5 === 0 ? 1.5 : 0.75;
       ctx.stroke();
     }
@@ -169,7 +145,7 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
       ctx.fillText("CONFIRMED", cx + radius + 4, cy + (size === "lg" ? 18 : 14));
     }
 
-    // Score text
+    // Score text — orange
     ctx.font = `bold ${cfg.fontSize}px "JetBrains Mono", monospace`;
     ctx.fillStyle = accent;
     ctx.textAlign = "center";
@@ -183,10 +159,9 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     ctx.fillText(label, cx, labelY);
   }, [displayScore, size, label]);
 
-  // Re-render on theme change
   useEffect(() => {
     const observer = new MutationObserver(() => {
-      setDisplayScore((s) => s); // Force re-render
+      setDisplayScore((s) => s);
     });
     observer.observe(document.documentElement, {
       attributes: true,
@@ -197,20 +172,6 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
 
   const cfg = SIZES[size];
 
-  // Build formula string
-  const formulaStr = breakdown
-    ? (() => {
-        const parts: string[] = [];
-        const e = breakdown.evidence;
-        const m = breakdown.momentum;
-        const c = breakdown.conviction;
-        if (e) parts.push(`E ${Math.round(e.score)}×${e.weight.toFixed(2)}`);
-        if (m) parts.push(`M ${Math.round(m.score)}×${m.weight.toFixed(2)}`);
-        if (c) parts.push(`C ${Math.round(c.score)}×${c.weight.toFixed(2)}`);
-        return parts.join(" + ") + ` = ${Math.round(score)}`;
-      })()
-    : null;
-
   return (
     <div className="flex flex-col items-center">
       <canvas
@@ -218,19 +179,19 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
         style={{ width: cfg.width, height: cfg.height }}
         className="block"
       />
-      {formulaStr && (
+      {formulaText && (
         <div
           className="mt-1 text-center"
           style={{
             fontFamily: "JetBrains Mono, monospace",
-            fontSize: size === "lg" ? "12px" : size === "md" ? "10px" : "9px",
-            color: "var(--text-muted)",
+            fontSize: "11px",
+            color: "#6B6B6B",
             letterSpacing: "-0.02em",
-            maxWidth: cfg.width,
+            maxWidth: cfg.width + 40,
             lineHeight: "1.4",
           }}
         >
-          {formulaStr}
+          {formulaText}
         </div>
       )}
     </div>

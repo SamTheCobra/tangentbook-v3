@@ -19,6 +19,7 @@ export default function ThesisDetailPage() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [loading, setLoading] = useState(true);
   const [feedsOpen, setFeedsOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const reloadThesis = async () => {
     const t = await api.getThesis(id);
@@ -60,6 +61,25 @@ export default function ThesisDetailPage() {
     await api.updateConviction(id, score, note);
     await reloadThesis();
   };
+
+  const handleRefreshFeeds = async () => {
+    setRefreshing(true);
+    try {
+      await api.refreshFeeds(id);
+      const [t, f] = await Promise.all([api.getThesis(id), api.getFeeds(id)]);
+      setThesis(t);
+      setFeeds(f);
+    } catch (e) {
+      console.error("Feed refresh failed:", e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const eScore = Math.round(thesis.thi.evidence.score);
+  const mScore = Math.round(thesis.thi.momentum.score);
+  const cScore = Math.round(thesis.thi.conviction.score);
+  const thiFormula = `THI = Evidence(${eScore}) × 0.50 + Momentum(${mScore}) × 0.30 + Quality(${cScore}) × 0.20`;
 
   return (
     <ErrorBoundary>
@@ -115,7 +135,6 @@ export default function ThesisDetailPage() {
               </div>
             </div>
 
-            {/* Conviction Slider - only on detail page */}
             <div className="mt-4">
               <ConvictionSlider
                 score={thesis.userConviction.score}
@@ -130,22 +149,22 @@ export default function ThesisDetailPage() {
               score={thesis.thi.score}
               size="lg"
               label="THESIS HEALTH INDEX"
-              breakdown={{
-                evidence: thesis.thi.evidence,
-                momentum: thesis.thi.momentum,
-                conviction: thesis.thi.conviction,
-              }}
+              formulaText={thiFormula}
             />
           </div>
         </div>
 
-        {/* 1px separator */}
         <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
 
         {/* Sub-needles row */}
         <div className="flex gap-12 mb-8">
           <div className="text-center">
-            <Needle score={thesis.thi.evidence.score} size="md" label="EVIDENCE" />
+            <Needle
+              score={thesis.thi.evidence.score}
+              size="md"
+              label="EVIDENCE"
+              formulaText="Flow(35%) + Structural(30%) + Adoption(20%) + Policy(15%)"
+            />
             <span
               className="uppercase mt-1 block"
               style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}
@@ -154,7 +173,12 @@ export default function ThesisDetailPage() {
             </span>
           </div>
           <div className="text-center">
-            <Needle score={thesis.thi.momentum.score} size="md" label="MOMENTUM" />
+            <Needle
+              score={thesis.thi.momentum.score}
+              size="md"
+              label="MOMENTUM"
+              formulaText="Short(50%) + Medium(35%) + Long(15%) rate-of-change"
+            />
             <span
               className="uppercase mt-1 block"
               style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}
@@ -163,7 +187,12 @@ export default function ThesisDetailPage() {
             </span>
           </div>
           <div className="text-center">
-            <Needle score={thesis.thi.conviction.score} size="md" label="DATA QUALITY" />
+            <Needle
+              score={thesis.thi.conviction.score}
+              size="md"
+              label="DATA QUALITY"
+              formulaText="Agreement(50%) + Freshness(30%) + Source(20%)"
+            />
             <span
               className="uppercase mt-1 block"
               style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}
@@ -173,50 +202,48 @@ export default function ThesisDetailPage() {
           </div>
         </div>
 
-        {/* 1px separator */}
         <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
 
         {/* Feed Health Panel */}
         <div className="mb-8">
-          <button
-            onClick={() => setFeedsOpen(!feedsOpen)}
-            className="uppercase mb-4 flex items-center gap-2"
-            style={{
-              color: "var(--text-muted)",
-              letterSpacing: "0.08em",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "Inter, system-ui, sans-serif",
-              fontSize: "13px",
-            }}
-          >
-            FEEDS ({feeds.length})
-            <span style={{ fontSize: "12px" }}>{feedsOpen ? "−" : "+"}</span>
-          </button>
+          <div className="flex items-center gap-4 mb-4">
+            <button
+              onClick={() => setFeedsOpen(!feedsOpen)}
+              className="uppercase flex items-center gap-2"
+              style={{
+                color: "var(--text-muted)",
+                letterSpacing: "0.08em",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "Inter, system-ui, sans-serif",
+                fontSize: "13px",
+              }}
+            >
+              FEEDS ({feeds.length})
+              <span style={{ fontSize: "12px" }}>{feedsOpen ? "−" : "+"}</span>
+            </button>
+
+            <button
+              onClick={handleRefreshFeeds}
+              disabled={refreshing}
+              className="uppercase px-3 py-1 border"
+              style={{
+                color: refreshing ? "var(--text-muted)" : "var(--accent)",
+                borderColor: refreshing ? "var(--border)" : "var(--accent)",
+                letterSpacing: "0.08em",
+                background: "none",
+                cursor: refreshing ? "wait" : "pointer",
+                fontSize: "12px",
+                opacity: refreshing ? 0.6 : 1,
+              }}
+            >
+              {refreshing ? "FETCHING..." : "REFRESH ALL"}
+            </button>
+          </div>
 
           {feedsOpen && (
             <div className="mb-3 flex items-center gap-4">
-              <button
-                onClick={async () => {
-                  await api.refreshFeeds(id);
-                  const [t, f] = await Promise.all([api.getThesis(id), api.getFeeds(id)]);
-                  setThesis(t);
-                  setFeeds(f);
-                }}
-                className="uppercase hover:underline"
-                style={{
-                  color: "var(--text-muted)",
-                  letterSpacing: "0.08em",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  textUnderlineOffset: "3px",
-                  fontSize: "13px",
-                }}
-              >
-                REFRESH
-              </button>
               {(() => {
                 const live = feeds.filter((f) => f.status === "live").length;
                 const offline = feeds.filter((f) => f.status === "offline").length;
@@ -264,7 +291,7 @@ export default function ThesisDetailPage() {
                   </span>
                   <span
                     style={{
-                      color: "var(--text)",
+                      color: feed.normalizedScore != null ? "var(--accent)" : "var(--text-muted)",
                       fontFamily: "JetBrains Mono, monospace",
                       minWidth: "32px",
                       textAlign: "right",
@@ -316,7 +343,6 @@ export default function ThesisDetailPage() {
           </>
         )}
 
-        {/* Effects */}
         {/* Effect Chain Diagram */}
         {thesis.effects.length > 0 && (
           <>
@@ -361,8 +387,6 @@ export default function ThesisDetailPage() {
 }
 
 function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId: string; onUpdated: () => void }) {
-  const [expanded, setExpanded] = useState(false);
-
   const handleDelete = async () => {
     if (!confirm(`Delete "${effect.title}"? This cannot be undone.`)) return;
     await api.deleteEffect(effect.id);
@@ -381,21 +405,14 @@ function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId:
             >
               {effect.title}
             </Link>
-            <div className="flex items-center gap-1 ml-1">
-              <button
-                onClick={() => setExpanded(!expanded)}
-                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
-              >
-                {expanded ? "−" : "+"}
-              </button>
-              <button
-                onClick={handleDelete}
-                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
-                title="Delete effect"
-              >
-                x
-              </button>
-            </div>
+            <button
+              onClick={handleDelete}
+              className="ml-1 flex-shrink-0"
+              style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
+              title="Delete effect"
+            >
+              x
+            </button>
           </div>
           <p className="mt-1" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
             {effect.description}
@@ -404,36 +421,48 @@ function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId:
         <Needle score={effect.thi.score} size="sm" />
       </div>
 
-      {expanded && (
+      {/* Equity Bets inline */}
+      {effect.equityBets.length > 0 && (
         <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
-          {effect.equityBets.length > 0 && (
-            <div className="mb-3">
-              <span className="uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
-                EQUITY BETS
-              </span>
-              {effect.equityBets.map((bet) => (
-                <div key={bet.id} className="flex items-center gap-3 mb-1">
-                  <span style={{ color: "var(--text)", fontFamily: "JetBrains Mono, monospace", fontSize: "14px" }}>{bet.ticker}</span>
-                  <span className="uppercase" style={{
-                    color: bet.role === "BENEFICIARY" ? "var(--positive)" : bet.role === "HEADWIND" ? "var(--text-muted)" : "var(--accent)",
-                    fontSize: "11px", letterSpacing: "0.08em",
-                  }}>{bet.role}</span>
-                </div>
-              ))}
+          <span className="uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
+            EQUITY BETS
+          </span>
+          {effect.equityBets.map((bet) => (
+            <div key={bet.id} className="flex items-center gap-3 mb-1">
+              <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "14px" }}>{bet.ticker}</span>
+              <span className="uppercase" style={{
+                color: bet.role === "BENEFICIARY" ? "var(--positive)" : bet.role === "HEADWIND" ? "var(--text-muted)" : "var(--accent)",
+                fontSize: "11px", letterSpacing: "0.08em",
+              }}>{bet.role}</span>
+              <span style={{ color: "var(--text-muted)", fontSize: "12px", flex: 1 }}>{bet.rationale}</span>
             </div>
-          )}
-          {effect.startupOpportunities.length > 0 && (
-            <div>
-              <span className="uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
-                OPPORTUNITIES
-              </span>
-              {effect.startupOpportunities.map((opp) => (
-                <div key={opp.id} className="mb-1" style={{ color: "var(--text-muted)", fontSize: "14px" }}>
-                  <span style={{ color: "var(--text)" }}>{opp.name}</span> — {opp.oneLiner}
-                </div>
-              ))}
+          ))}
+        </div>
+      )}
+
+      {/* Startup Opportunities inline */}
+      {effect.startupOpportunities.length > 0 && (
+        <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+          <span className="uppercase block mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
+            OPPORTUNITIES
+          </span>
+          {effect.startupOpportunities.map((opp) => (
+            <div key={opp.id} className="mb-1" style={{ color: "var(--text-muted)", fontSize: "13px" }}>
+              <span style={{ color: "var(--text)" }}>{opp.name}</span> — {opp.oneLiner}
             </div>
-          )}
+          ))}
+        </div>
+      )}
+
+      {/* CTAs for empty sections */}
+      {effect.equityBets.length === 0 && effect.startupOpportunities.length === 0 && (
+        <div className="mt-3 pt-3 flex gap-4" style={{ borderTop: "1px solid var(--border)" }}>
+          <span className="uppercase" style={{ color: "var(--text-muted)", fontSize: "12px", letterSpacing: "0.08em", opacity: 0.6 }}>
+            + Add equity bet
+          </span>
+          <span className="uppercase" style={{ color: "var(--text-muted)", fontSize: "12px", letterSpacing: "0.08em", opacity: 0.6 }}>
+            + Add opportunity
+          </span>
         </div>
       )}
     </div>
@@ -527,14 +556,12 @@ function StatusDot({ status }: { status: string }) {
         className="w-2 h-2"
         style={{ background: color, borderRadius: "1px" }}
       />
-      {status !== "live" && (
-        <span
-          className="uppercase"
-          style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
-        >
-          {status.toUpperCase()}
-        </span>
-      )}
+      <span
+        className="uppercase"
+        style={{ color: status === "live" ? "var(--positive)" : "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
+      >
+        {status.toUpperCase()}
+      </span>
     </div>
   );
 }

@@ -145,16 +145,16 @@ def _return_cached(cache_entry: FeedCache | None) -> dict | None:
 
 
 async def fetch_macro_header_data() -> dict:
-    """Fetch FFR, 10Y-2Y spread, and VIX proxy from FRED."""
+    """Fetch FFR, 10Y-2Y spread, and VIX from FRED."""
     results = {}
 
     if not FRED_API_KEY or FRED_API_KEY == "your_fred_key_here":
+        logger.warning("FRED API key not configured — skipping macro header fetch")
         return results
 
     series_map = {
         "ffr": "FEDFUNDS",
-        "dgs10": "DGS10",
-        "dgs2": "DGS2",
+        "spread": "T10Y2Y",
         "vix": "VIXCLS",
     }
 
@@ -166,17 +166,24 @@ async def fetch_macro_header_data() -> dict:
                     "api_key": FRED_API_KEY,
                     "file_type": "json",
                     "sort_order": "desc",
-                    "limit": 5,
+                    "limit": 10,
                 }
                 resp = await client.get(FRED_BASE_URL, params=params)
                 resp.raise_for_status()
                 data = resp.json()
 
+                found = False
                 for obs in data.get("observations", []):
                     if obs.get("value") and obs["value"] != ".":
                         results[key] = float(obs["value"])
+                        found = True
+                        logger.info(f"FRED macro {series_id}: {obs['value']} (date: {obs.get('date', '?')})")
                         break
+                if not found:
+                    logger.warning(f"FRED macro {series_id}: no valid observations in response")
+            except httpx.HTTPStatusError as e:
+                logger.error(f"FRED macro header HTTP error for {series_id}: {e.response.status_code} - {e.response.text[:200]}")
             except Exception as e:
-                logger.error(f"FRED macro header error for {series_id}: {e}")
+                logger.error(f"FRED macro header error for {series_id}: {type(e).__name__}: {e}")
 
     return results

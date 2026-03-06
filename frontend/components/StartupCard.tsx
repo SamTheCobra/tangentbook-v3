@@ -23,26 +23,19 @@ export default function StartupCard({ opportunity }: StartupCardProps) {
         {opportunity.oneLiner}
       </p>
 
-      {/* Timing badges — all shown, active highlighted */}
+      {/* Timing badges — all shown, active highlighted, inactive very dark */}
       <div className="mt-3 flex items-center gap-2">
         {ALL_TIMINGS.map((timing) => {
           const isActive = opportunity.timing === timing;
-          const activeColor =
-            timing === "RIGHT_TIMING"
-              ? "var(--positive)"
-              : timing === "TOO_EARLY"
-              ? "var(--text-muted)"
-              : "var(--accent)";
           return (
             <span
               key={timing}
               className="uppercase px-2 py-0.5 border"
               style={{
-                color: isActive ? activeColor : "var(--border)",
-                borderColor: isActive ? activeColor : "var(--border)",
+                color: isActive ? "#E8440A" : "#3A3A3A",
+                borderColor: isActive ? "#E8440A" : "#2A2A2A",
                 letterSpacing: "0.08em",
                 fontSize: "11px",
-                opacity: isActive ? 1 : 0.4,
               }}
             >
               {timing.replace(/_/g, " ")}

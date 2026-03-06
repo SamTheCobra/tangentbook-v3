@@ -13,7 +13,7 @@ export default function Header({ onNewThesis }: HeaderProps) {
   const [macro, setMacro] = useState<MacroHeader | null>(null);
 
   useEffect(() => {
-    api.getMacroHeader().then(setMacro).catch(() => {});
+    api.getMacroHeader().then(setMacro).catch((e) => console.error("Macro header fetch failed:", e));
   }, []);
 
   return (
@@ -40,22 +40,22 @@ export default function Header({ onNewThesis }: HeaderProps) {
 
         {macro && (
           <div className="flex items-center gap-6">
-            <MacroItem label="REGIME" value={macro.regime || "——"} />
+            <MacroItem label="REGIME" value={macro.regime || "N/A"} />
             <MacroItem
               label="FFR"
-              value={macro.ffr != null ? `${macro.ffr.toFixed(2)}%` : "——"}
+              value={macro.ffr != null ? `${macro.ffr.toFixed(2)}%` : "N/A"}
             />
             <MacroItem
               label="10Y-2Y"
               value={
                 macro.tenYearTwoYearSpread != null
                   ? `${macro.tenYearTwoYearSpread.toFixed(2)}`
-                  : "——"
+                  : "N/A"
               }
             />
             <MacroItem
               label="VIX"
-              value={macro.vix != null ? macro.vix.toFixed(1) : "——"}
+              value={macro.vix != null ? macro.vix.toFixed(1) : "N/A"}
             />
           </div>
         )}
@@ -86,7 +86,7 @@ export default function Header({ onNewThesis }: HeaderProps) {
 }
 
 function MacroItem({ label, value }: { label: string; value: string }) {
-  const isPlaceholder = value === "——";
+  const isPlaceholder = value === "N/A" || value === "——";
   return (
     <div className="flex items-center gap-2">
       <span

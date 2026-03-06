@@ -118,7 +118,7 @@ export default function EffectDetailPage() {
                 <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}>
                   CONVICTION
                 </span>
-                <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
+                <span style={{ color: "#E8440A", fontFamily: "JetBrains Mono, monospace", fontSize: "15px" }}>
                   {effect.userConviction.score}/10
                 </span>
               </div>

@@ -20,14 +20,14 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
       {/* Ticker + Price */}
-      <div className="flex items-start justify-between mb-2">
+      <div className="flex items-start justify-between mb-1">
         <div>
           <span
             className="font-bold block"
             style={{
-              color: "var(--accent)",
+              color: "#E8440A",
               fontFamily: "JetBrains Mono, monospace",
-              fontSize: "20px",
+              fontSize: "24px",
               letterSpacing: "-0.02em",
             }}
           >
@@ -36,8 +36,8 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
           <span
             className="block mt-0.5"
             style={{
-              color: "var(--text)",
-              fontSize: "14px",
+              color: "#6B6B6B",
+              fontSize: "13px",
               lineHeight: "1.3",
             }}
           >
@@ -78,7 +78,7 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
         <div className="mb-3">
           <Sparkline
             data={priceHistory}
-            color="var(--accent)"
+            color="#E8440A"
             width={200}
             height={32}
           />
@@ -90,26 +90,19 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
         {bet.rationale}
       </p>
 
-      {/* Role badges — all shown, active highlighted */}
+      {/* Role badges — all 3 shown, active highlighted, inactive very dark */}
       <div className="mt-3 flex items-center gap-2">
         {ALL_ROLES.map((role) => {
           const isActive = bet.role === role;
-          const activeColor =
-            role === "BENEFICIARY"
-              ? "var(--positive)"
-              : role === "HEADWIND"
-              ? "var(--accent)"
-              : "var(--accent-soft)";
           return (
             <span
               key={role}
               className="uppercase px-2 py-0.5 border"
               style={{
-                color: isActive ? activeColor : "var(--border)",
-                borderColor: isActive ? activeColor : "var(--border)",
+                color: isActive ? "#E8440A" : "#3A3A3A",
+                borderColor: isActive ? "#E8440A" : "#2A2A2A",
                 letterSpacing: "0.08em",
                 fontSize: "11px",
-                opacity: isActive ? 1 : 0.4,
               }}
             >
               {role}
@@ -124,7 +117,7 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
           <span
             className="uppercase"
             style={{
-              color: "var(--accent)",
+              color: "#E8440A",
               letterSpacing: "0.08em",
               fontSize: "11px",
             }}

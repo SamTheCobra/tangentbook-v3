@@ -51,6 +51,17 @@ async def startup():
     finally:
         db.close()
 
+    # Fetch macro header data on startup
+    db = SessionLocal()
+    try:
+        from services.feed_refresh import refresh_macro_header
+        await refresh_macro_header(db)
+        logger.info("Macro header data fetched on startup")
+    except Exception as e:
+        logger.error(f"Startup macro header fetch failed: {e}")
+    finally:
+        db.close()
+
     # Start background scheduler
     scheduler.add_job(
         scheduled_refresh,

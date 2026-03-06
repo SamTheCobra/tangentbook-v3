@@ -76,8 +76,18 @@ def feed_history(feed_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/macro/header")
-def macro_header(db: Session = Depends(get_db)):
+async def macro_header(db: Session = Depends(get_db)):
     header = db.query(MacroHeader).order_by(MacroHeader.last_updated.desc()).first()
+
+    # If no header exists or data is missing, try fetching fresh
+    if not header or header.ffr is None:
+        try:
+            await refresh_macro_header(db)
+            header = db.query(MacroHeader).order_by(MacroHeader.last_updated.desc()).first()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Macro header fetch failed: {e}")
+
     if not header:
         return {
             "regime": "NEUTRAL",

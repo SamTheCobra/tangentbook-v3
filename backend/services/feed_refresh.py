@@ -164,10 +164,8 @@ async def refresh_macro_header(db: Session):
     header = db.query(MacroHeader).order_by(MacroHeader.last_updated.desc()).first()
 
     ffr = data.get("ffr")
-    dgs10 = data.get("dgs10")
-    dgs2 = data.get("dgs2")
+    spread = data.get("spread")
     vix = data.get("vix")
-    spread = round(dgs10 - dgs2, 2) if dgs10 is not None and dgs2 is not None else None
 
     # Determine regime
     regime = "NEUTRAL"
