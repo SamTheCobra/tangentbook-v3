@@ -378,55 +378,52 @@ export default function ThesisDetailPage() {
                 />
               </div>
               {activeTab === "bets" && (() => {
-                // Build EFS lookup and compute global ranks
                 const efsMap: Record<string, EFSScore> = {};
                 efsScores.forEach((r) => {
                   if (r.efs) efsMap[r.betId] = r.efs;
                 });
+                const ROLE_ORDER: Record<string, number> = { BENEFICIARY: 0, HEADWIND: 1, CANARY: 2 };
                 const sortedBets = [...thesis.equityBets].sort((a, b) => {
-                  const aScore = efsMap[a.id]?.efsScore ?? -1;
-                  const bScore = efsMap[b.id]?.efsScore ?? -1;
-                  return bScore - aScore;
+                  const roleA = ROLE_ORDER[a.role] ?? 9;
+                  const roleB = ROLE_ORDER[b.role] ?? 9;
+                  if (roleA !== roleB) return roleA - roleB;
+                  return (efsMap[b.id]?.efsScore ?? -1) - (efsMap[a.id]?.efsScore ?? -1);
                 });
                 const rankMap: Record<string, number> = {};
                 sortedBets.forEach((bet, i) => {
                   if (efsMap[bet.id]) rankMap[bet.id] = i + 1;
                 });
                 return (
-                  <CategoryColumns
-                    items={sortedBets}
-                    getRole={(bet) => bet.role}
-                    renderItem={(bet) => (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
+                    {sortedBets.map((bet) => (
                       <EquityBetCard
                         key={bet.id}
                         bet={bet}
                         efs={efsMap[bet.id] ?? null}
                         rank={rankMap[bet.id]}
                       />
-                    )}
-                    emptyNoun="stocks"
-                  />
+                    ))}
+                  </div>
                 );
               })()}
-              {activeTab === "startups" && (
-                <CategoryColumns
-                  items={thesis.startupOpportunities}
-                  getRole={(opp) => {
-                    const timing = stsMap[opp.id]?.timingLabel ?? opp.timing;
-                    if (timing === "RIGHT_TIMING") return "BENEFICIARY";
-                    if (timing === "TOO_EARLY") return "HEADWIND";
-                    return "CANARY";
-                  }}
-                  renderItem={(opp) => (
-                    <StartupCard
-                      key={opp.id}
-                      opportunity={opp}
-                      sts={stsMap[opp.id] ?? null}
-                    />
-                  )}
-                  emptyNoun="startups"
-                />
-              )}
+              {activeTab === "startups" && (() => {
+                const sortedOpps = [...thesis.startupOpportunities].sort((a, b) => {
+                  const stsA = stsMap[a.id]?.stsScore ?? -1;
+                  const stsB = stsMap[b.id]?.stsScore ?? -1;
+                  return stsB - stsA;
+                });
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
+                    {sortedOpps.map((opp) => (
+                      <StartupCard
+                        key={opp.id}
+                        opportunity={opp}
+                        sts={stsMap[opp.id] ?? null}
+                      />
+                    ))}
+                  </div>
+                );
+              })()}
             </>
           )}
 
@@ -864,115 +861,6 @@ function TabButton({
     >
       {label}
     </button>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   CATEGORY COLUMNS — 3-column layout for bets & startups
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-const CATEGORY_COLUMNS = [
-  {
-    role: "BENEFICIARY",
-    label: "RIDE THE WAVE",
-    color: "#FF4500",
-    description: "Stocks/startups that win directly because this thesis plays out. Build here now.",
-  },
-  {
-    role: "HEADWIND",
-    label: "FIGHT THE TIDE",
-    color: "#5A5A5A",
-    description: "Stocks/startups solving the problems this thesis creates for incumbents being disrupted.",
-  },
-  {
-    role: "CANARY",
-    label: "WATCH THIS SPACE",
-    color: "var(--text)",
-    description: "Stocks/startups whose traction tells you how fast the thesis is actually moving.",
-  },
-];
-
-function CategoryColumns<T extends { id: string }>({
-  items,
-  getRole,
-  renderItem,
-  emptyNoun,
-}: {
-  items: T[];
-  getRole: (item: T) => string;
-  renderItem: (item: T) => React.ReactNode;
-  emptyNoun: string;
-}) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
-      {CATEGORY_COLUMNS.map((col, colIdx) => {
-        const filtered = items.filter((item) => getRole(item) === col.role);
-        return (
-          <div
-            key={col.role}
-            style={{
-              borderRight: colIdx < 2 ? "1px solid var(--border)" : undefined,
-            }}
-          >
-            {/* Sticky column header */}
-            <div
-              className="sticky top-0 z-10 p-4 border-b"
-              style={{
-                background: "var(--bg)",
-                borderColor: "var(--border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: 8,
-                    height: 8,
-                    background: col.color,
-                  }}
-                />
-                <span
-                  className="uppercase font-bold"
-                  style={{
-                    color: "var(--text)",
-                    letterSpacing: "0.08em",
-                    fontSize: "13px",
-                  }}
-                >
-                  {col.label}
-                </span>
-              </div>
-              <p
-                style={{
-                  color: "var(--text-muted)",
-                  fontSize: "11px",
-                  fontStyle: "italic",
-                  lineHeight: "1.4",
-                  margin: 0,
-                }}
-              >
-                {col.description}
-              </p>
-            </div>
-            {/* Cards */}
-            {filtered.length > 0 ? (
-              filtered.map((item) => renderItem(item))
-            ) : (
-              <div
-                className="p-4"
-                style={{
-                  color: "var(--text-muted)",
-                  fontSize: "12px",
-                  fontStyle: "italic",
-                }}
-              >
-                No {col.label.toLowerCase()} {emptyNoun} identified yet
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
   );
 }
 
