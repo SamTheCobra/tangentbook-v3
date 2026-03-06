@@ -151,6 +151,7 @@ def bet_to_dict(b: EquityBet) -> dict:
         "id": b.id,
         "ticker": b.ticker,
         "companyName": b.company_name,
+        "companyDescription": b.company_description,
         "role": b.role,
         "rationale": b.rationale,
         "timeHorizon": b.time_horizon,

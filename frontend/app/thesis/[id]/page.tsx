@@ -205,107 +205,13 @@ export default function ThesisDetailPage() {
         <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
 
         {/* Feed Health Panel */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <button
-              onClick={() => setFeedsOpen(!feedsOpen)}
-              className="uppercase flex items-center gap-2"
-              style={{
-                color: "var(--text-muted)",
-                letterSpacing: "0.08em",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "Inter, system-ui, sans-serif",
-                fontSize: "13px",
-              }}
-            >
-              FEEDS ({feeds.length})
-              <span style={{ fontSize: "12px" }}>{feedsOpen ? "−" : "+"}</span>
-            </button>
-
-            <button
-              onClick={handleRefreshFeeds}
-              disabled={refreshing}
-              className="uppercase px-3 py-1 border"
-              style={{
-                color: refreshing ? "var(--text-muted)" : "var(--accent)",
-                borderColor: refreshing ? "var(--border)" : "var(--accent)",
-                letterSpacing: "0.08em",
-                background: "none",
-                cursor: refreshing ? "wait" : "pointer",
-                fontSize: "12px",
-                opacity: refreshing ? 0.6 : 1,
-              }}
-            >
-              {refreshing ? "FETCHING..." : "REFRESH ALL"}
-            </button>
-          </div>
-
-          {feedsOpen && (
-            <div className="mb-3 flex items-center gap-4">
-              {(() => {
-                const live = feeds.filter((f) => f.status === "live").length;
-                const offline = feeds.filter((f) => f.status === "offline").length;
-                const degraded = feeds.filter((f) => f.status === "degraded").length;
-                return (
-                  <span style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
-                    {live} live / {feeds.length - live - offline - degraded} stale / {degraded} degraded / {offline} offline
-                  </span>
-                );
-              })()}
-            </div>
-          )}
-
-          {feedsOpen && (
-            <div className="border" style={{ borderColor: "var(--border)" }}>
-              {feeds.map((feed, i) => (
-                <div
-                  key={feed.id}
-                  className="px-4 py-2 flex items-center gap-4"
-                  style={{
-                    borderTop: i > 0 ? "1px solid var(--border)" : "none",
-                    background: "var(--surface)",
-                  }}
-                >
-                  <span
-                    className="uppercase px-2 py-0.5 border flex-shrink-0"
-                    style={{
-                      color: "var(--text-muted)",
-                      borderColor: "var(--border)",
-                      letterSpacing: "0.08em",
-                      fontSize: "11px",
-                      minWidth: "60px",
-                      textAlign: "center",
-                    }}
-                  >
-                    {feed.source}
-                  </span>
-                  <span className="flex-1" style={{ color: "var(--text)", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
-                    {feed.name}
-                  </span>
-                  <span
-                    style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}
-                  >
-                    {feed.lastFetched ? new Date(feed.lastFetched).toLocaleDateString() : "——"}
-                  </span>
-                  <span
-                    style={{
-                      color: feed.normalizedScore != null ? "var(--accent)" : "var(--text-muted)",
-                      fontFamily: "JetBrains Mono, monospace",
-                      minWidth: "32px",
-                      textAlign: "right",
-                      fontSize: "13px",
-                    }}
-                  >
-                    {feed.normalizedScore != null ? Math.round(feed.normalizedScore) : "——"}
-                  </span>
-                  <StatusDot status={feed.status} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <FeedPanel
+          feeds={feeds}
+          feedsOpen={feedsOpen}
+          setFeedsOpen={setFeedsOpen}
+          refreshing={refreshing}
+          onRefresh={handleRefreshFeeds}
+        />
 
         {/* Equity Bets */}
         {thesis.equityBets.length > 0 && (
@@ -383,6 +289,264 @@ export default function ThesisDetailPage() {
       </div>
     </main>
     </ErrorBoundary>
+  );
+}
+
+function formatFeedName(feed: Feed): string {
+  // Clean up auto-generated names like "Fred M2 Money Supply" → "M2 Money Supply"
+  let name = feed.name;
+  // Remove source prefix if present
+  name = name.replace(/^(Fred|Gtrends|Alpha Vantage)\s+/i, "");
+  return name;
+}
+
+function formatRawValue(feed: Feed): string {
+  if (feed.rawValue == null) return "——";
+  const v = feed.rawValue;
+  if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}T`;
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
+  if (Number.isInteger(v)) return v.toString();
+  return v.toFixed(2);
+}
+
+function FeedPanel({
+  feeds,
+  feedsOpen,
+  setFeedsOpen,
+  refreshing,
+  onRefresh,
+}: {
+  feeds: Feed[];
+  feedsOpen: boolean;
+  setFeedsOpen: (v: boolean) => void;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const [expandedFeed, setExpandedFeed] = useState<string | null>(null);
+
+  const live = feeds.filter((f) => f.status === "live").length;
+  const offline = feeds.filter((f) => f.status === "offline").length;
+  const degraded = feeds.filter((f) => f.status === "degraded").length;
+  const stale = feeds.length - live - offline - degraded;
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center gap-4 mb-4">
+        <button
+          onClick={() => setFeedsOpen(!feedsOpen)}
+          className="uppercase flex items-center gap-2"
+          style={{
+            color: "var(--text-muted)",
+            letterSpacing: "0.08em",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontSize: "13px",
+          }}
+        >
+          FEEDS ({feeds.length})
+          <span style={{ fontSize: "12px" }}>{feedsOpen ? "−" : "+"}</span>
+        </button>
+
+        <button
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="uppercase px-3 py-1 border"
+          style={{
+            color: refreshing ? "var(--text-muted)" : "var(--accent)",
+            borderColor: refreshing ? "var(--border)" : "var(--accent)",
+            letterSpacing: "0.08em",
+            background: "none",
+            cursor: refreshing ? "wait" : "pointer",
+            fontSize: "12px",
+            opacity: refreshing ? 0.6 : 1,
+          }}
+        >
+          {refreshing ? "FETCHING..." : "REFRESH ALL"}
+        </button>
+
+        {feedsOpen && (
+          <span style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>
+            {live} live / {stale} stale / {degraded} degraded / {offline} offline
+          </span>
+        )}
+      </div>
+
+      {feedsOpen && (
+        <div className="border" style={{ borderColor: "var(--border)" }}>
+          {feeds.map((feed, i) => {
+            const isExpanded = expandedFeed === feed.id;
+            const score = feed.normalizedScore != null ? Math.round(feed.normalizedScore) : null;
+
+            return (
+              <div
+                key={feed.id}
+                style={{
+                  borderTop: i > 0 ? "1px solid var(--border)" : "none",
+                  background: "var(--surface)",
+                }}
+              >
+                {/* Main row */}
+                <button
+                  onClick={() => setExpandedFeed(isExpanded ? null : feed.id)}
+                  className="w-full px-4 py-3 flex items-center gap-4 text-left"
+                  style={{ background: "none", border: "none", cursor: "pointer" }}
+                >
+                  {/* Expand indicator */}
+                  <span style={{ color: "var(--text-muted)", fontSize: "11px", width: "12px", flexShrink: 0 }}>
+                    {isExpanded ? "−" : "+"}
+                  </span>
+
+                  {/* Name + Series ID */}
+                  <div className="flex-1 min-w-0">
+                    <span style={{ color: "var(--text)", fontSize: "14px", display: "block" }}>
+                      {formatFeedName(feed)}
+                    </span>
+                    <span style={{ color: "#4A4A4A", fontSize: "11px", fontFamily: "JetBrains Mono, monospace" }}>
+                      {feed.seriesId || feed.keyword || feed.source}
+                    </span>
+                  </div>
+
+                  {/* Raw value */}
+                  <span
+                    className="flex-shrink-0"
+                    style={{
+                      color: "var(--text)",
+                      fontFamily: "JetBrains Mono, monospace",
+                      fontSize: "13px",
+                      minWidth: "60px",
+                      textAlign: "right",
+                    }}
+                  >
+                    {formatRawValue(feed)}
+                  </span>
+
+                  {/* Normalized score + bar */}
+                  <div className="flex items-center gap-2 flex-shrink-0" style={{ width: "100px" }}>
+                    <div
+                      style={{
+                        width: "60px",
+                        height: "6px",
+                        background: "#1E1B18",
+                        position: "relative",
+                      }}
+                    >
+                      {score != null && (
+                        <div
+                          style={{
+                            width: `${Math.min(score, 100)}%`,
+                            height: "100%",
+                            background: "#E8440A",
+                          }}
+                        />
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        color: score != null ? "#E8440A" : "var(--text-muted)",
+                        fontFamily: "JetBrains Mono, monospace",
+                        fontSize: "13px",
+                        minWidth: "24px",
+                        textAlign: "right",
+                      }}
+                    >
+                      {score != null ? score : "——"}
+                    </span>
+                  </div>
+
+                  {/* Last updated */}
+                  <span
+                    className="flex-shrink-0"
+                    style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "11px", minWidth: "80px", textAlign: "right" }}
+                  >
+                    {feed.lastFetched ? new Date(feed.lastFetched).toLocaleDateString() : "——"}
+                  </span>
+
+                  {/* Status badge */}
+                  <FeedStatusBadge status={feed.status} />
+                </button>
+
+                {/* Expanded detail */}
+                {isExpanded && (
+                  <div
+                    className="px-4 pb-3 pl-10"
+                    style={{ background: "var(--surface)" }}
+                  >
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2" style={{ maxWidth: "600px" }}>
+                      <div>
+                        <span className="uppercase block" style={{ color: "#4A4A4A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                          SOURCE
+                        </span>
+                        <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>
+                          {feed.source} — {feed.sourceType}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="uppercase block" style={{ color: "#4A4A4A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                          CONFIRMING DIRECTION
+                        </span>
+                        <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>
+                          {feed.confirmingDirection === "higher" ? "↑ Higher confirms" : "↓ Lower confirms"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="uppercase block" style={{ color: "#4A4A4A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                          WEIGHT
+                        </span>
+                        <span style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
+                          {feed.weight.toFixed(2)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="uppercase block" style={{ color: "#4A4A4A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                          UPDATE FREQ
+                        </span>
+                        <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>
+                          {feed.updateFrequency}
+                        </span>
+                      </div>
+                    </div>
+                    {feed.description && (
+                      <p className="mt-2" style={{ color: "var(--text-muted)", fontSize: "13px", lineHeight: "1.5" }}>
+                        {feed.description}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FeedStatusBadge({ status }: { status: string }) {
+  const config: Record<string, { color: string; bg: string }> = {
+    live: { color: "var(--positive)", bg: "transparent" },
+    stale: { color: "var(--text-muted)", bg: "transparent" },
+    degraded: { color: "#E8440A", bg: "transparent" },
+    offline: { color: "#6B3A3A", bg: "transparent" },
+  };
+  const c = config[status] || config.stale;
+
+  return (
+    <span
+      className="uppercase flex-shrink-0"
+      style={{
+        color: c.color,
+        letterSpacing: "0.08em",
+        fontSize: "11px",
+        minWidth: "60px",
+        textAlign: "right",
+      }}
+    >
+      {status.toUpperCase()}
+    </span>
   );
 }
 
@@ -540,28 +704,3 @@ function AddEffectButton({ thesisId, onCreated }: { thesisId: string; onCreated:
   );
 }
 
-function StatusDot({ status }: { status: string }) {
-  const color =
-    status === "live"
-      ? "var(--positive)"
-      : status === "stale"
-      ? "var(--accent)"
-      : status === "degraded"
-      ? "var(--text-muted)"
-      : "var(--text-muted)";
-
-  return (
-    <div className="flex items-center gap-2">
-      <div
-        className="w-2 h-2"
-        style={{ background: color, borderRadius: "1px" }}
-      />
-      <span
-        className="uppercase"
-        style={{ color: status === "live" ? "var(--positive)" : "var(--text-muted)", letterSpacing: "0.08em", fontSize: "11px" }}
-      >
-        {status.toUpperCase()}
-      </span>
-    </div>
-  );
-}

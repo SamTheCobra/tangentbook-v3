@@ -108,6 +108,7 @@ export interface EquityBet {
   id: string;
   ticker: string;
   companyName: string;
+  companyDescription: string;
   role: string;
   rationale: string;
   timeHorizon: string;

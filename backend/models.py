@@ -161,6 +161,7 @@ class EquityBet(Base):
     effect_id = Column(String, ForeignKey("effects.id"), nullable=True)
     ticker = Column(String, nullable=False)
     company_name = Column(String, default="")
+    company_description = Column(Text, default="")
     role = Column(String, nullable=False)  # BENEFICIARY, HEADWIND, CANARY
     rationale = Column(Text, nullable=False)
     time_horizon = Column(String, default="1-3yr")
