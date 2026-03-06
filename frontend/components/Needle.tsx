@@ -82,13 +82,7 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     const pivotR = size === "lg" ? 5 : size === "md" ? 4 : 3;
     const tipR = size === "lg" ? 4 : size === "md" ? 3 : 2.5;
 
-    const opacity =
-      s < 30 ? 0.10 + (s / 30) * 0.15 :
-      s < 60 ? 0.25 + ((s - 30) / 30) * 0.20 :
-      s < 80 ? 0.45 + ((s - 60) / 20) * 0.15 :
-               0.60 + ((s - 80) / 20) * 0.10;
-
-    // WEDGE
+    // WEDGE — reveals a fixed stationary gradient
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(cx, cy);
@@ -98,8 +92,9 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     const gx1 = cx + radius;
     const grad = ctx.createLinearGradient(gx0, 0, gx1, 0);
     grad.addColorStop(0,    "rgba(232,68,10,0)");
-    grad.addColorStop(0.50, `rgba(232,68,10,${opacity})`);
-    grad.addColorStop(1,    `rgba(232,68,10,${opacity})`);
+    grad.addColorStop(0.50, "rgba(232,68,10,0.08)");
+    grad.addColorStop(0.80, "rgba(232,68,10,0.35)");
+    grad.addColorStop(1,    "rgba(232,68,10,0.65)");
     ctx.fillStyle = grad;
     ctx.fill();
     ctx.restore();
