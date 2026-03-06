@@ -18,6 +18,9 @@ import {
   EvidenceDimension,
   ScoringBreakdownFeed,
   Portfolio,
+  EquityScoreResult,
+  EFSScore,
+  STSScore,
 } from "@/lib/api";
 
 export default function ThesisDetailPage() {
@@ -31,16 +34,33 @@ export default function ThesisDetailPage() {
   const [activeTab, setActiveTab] = useState<"bets" | "startups">("bets");
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
+  const [efsScores, setEfsScores] = useState<EquityScoreResult[]>([]);
+  const [stsMap, setStsMap] = useState<Record<string, STSScore>>({});
 
   const reloadThesis = async () => {
-    const [t, b, p] = await Promise.all([
+    const [t, b, p, efs] = await Promise.all([
       api.getThesis(id),
       api.getScoringBreakdown(id),
       api.getPortfolio(id).catch(() => null),
+      api.getThesisEquityScores(id).catch(() => [] as EquityScoreResult[]),
     ]);
     setThesis(t);
     setBreakdown(b);
     if (p) setPortfolio(p);
+    setEfsScores(efs);
+    // Fetch STS for startups
+    if (t.startupOpportunities.length > 0) {
+      const stsResults = await Promise.all(
+        t.startupOpportunities.map((opp) =>
+          api.getStartupSTS(opp.id).catch(() => null)
+        )
+      );
+      const newStsMap: Record<string, STSScore> = {};
+      stsResults.forEach((r) => {
+        if (r?.sts) newStsMap[r.oppId] = r.sts;
+      });
+      setStsMap(newStsMap);
+    }
   };
 
   useEffect(() => {
@@ -49,11 +69,26 @@ export default function ThesisDetailPage() {
       api.getThesis(id),
       api.getScoringBreakdown(id).catch(() => null),
       api.getPortfolio(id).catch(() => null),
+      api.getThesisEquityScores(id).catch(() => [] as EquityScoreResult[]),
     ])
-      .then(([t, b, p]) => {
+      .then(async ([t, b, p, efs]) => {
         setThesis(t);
         setBreakdown(b);
         if (p) setPortfolio(p);
+        setEfsScores(efs);
+        // Fetch STS for startups
+        if (t.startupOpportunities.length > 0) {
+          const stsResults = await Promise.all(
+            t.startupOpportunities.map((opp) =>
+              api.getStartupSTS(opp.id).catch(() => null)
+            )
+          );
+          const newStsMap: Record<string, STSScore> = {};
+          stsResults.forEach((r) => {
+            if (r?.sts) newStsMap[r.oppId] = r.sts;
+          });
+          setStsMap(newStsMap);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -342,23 +377,53 @@ export default function ThesisDetailPage() {
                   onClick={() => setActiveTab("startups")}
                 />
               </div>
-              {activeTab === "bets" && (
-                <CategoryColumns
-                  items={thesis.equityBets}
-                  getRole={(bet) => bet.role}
-                  renderItem={(bet) => <EquityBetCard key={bet.id} bet={bet} />}
-                  emptyNoun="stocks"
-                />
-              )}
+              {activeTab === "bets" && (() => {
+                // Build EFS lookup and compute global ranks
+                const efsMap: Record<string, EFSScore> = {};
+                efsScores.forEach((r) => {
+                  if (r.efs) efsMap[r.betId] = r.efs;
+                });
+                const sortedBets = [...thesis.equityBets].sort((a, b) => {
+                  const aScore = efsMap[a.id]?.efsScore ?? -1;
+                  const bScore = efsMap[b.id]?.efsScore ?? -1;
+                  return bScore - aScore;
+                });
+                const rankMap: Record<string, number> = {};
+                sortedBets.forEach((bet, i) => {
+                  if (efsMap[bet.id]) rankMap[bet.id] = i + 1;
+                });
+                return (
+                  <CategoryColumns
+                    items={sortedBets}
+                    getRole={(bet) => bet.role}
+                    renderItem={(bet) => (
+                      <EquityBetCard
+                        key={bet.id}
+                        bet={bet}
+                        efs={efsMap[bet.id] ?? null}
+                        rank={rankMap[bet.id]}
+                      />
+                    )}
+                    emptyNoun="stocks"
+                  />
+                );
+              })()}
               {activeTab === "startups" && (
                 <CategoryColumns
                   items={thesis.startupOpportunities}
                   getRole={(opp) => {
-                    if (opp.timing === "RIGHT_TIMING") return "BENEFICIARY";
-                    if (opp.timing === "TOO_EARLY") return "HEADWIND";
+                    const timing = stsMap[opp.id]?.timingLabel ?? opp.timing;
+                    if (timing === "RIGHT_TIMING") return "BENEFICIARY";
+                    if (timing === "TOO_EARLY") return "HEADWIND";
                     return "CANARY";
                   }}
-                  renderItem={(opp) => <StartupCard key={opp.id} opportunity={opp} />}
+                  renderItem={(opp) => (
+                    <StartupCard
+                      key={opp.id}
+                      opportunity={opp}
+                      sts={stsMap[opp.id] ?? null}
+                    />
+                  )}
                   emptyNoun="startups"
                 />
               )}

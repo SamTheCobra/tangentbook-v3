@@ -7,7 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import validate_env, FEED_REFRESH_INTERVAL_MINUTES
 from database import init_db, SessionLocal
-from routers import theses, feeds, portfolio
+from routers import theses, feeds, portfolio, efs
 from seed import seed_database
 from services.feed_refresh import refresh_all_theses
 
@@ -28,6 +28,7 @@ app.add_middleware(
 app.include_router(theses.router)
 app.include_router(feeds.router)
 app.include_router(portfolio.router)
+app.include_router(efs.router)
 
 scheduler = AsyncIOScheduler()
 

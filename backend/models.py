@@ -271,3 +271,54 @@ class PortfolioSnapshot(Base):
     computed_at = Column(DateTime, default=datetime.utcnow)
 
     thesis = relationship("Thesis", backref="portfolio_snapshots")
+
+
+class EquityFitScore(Base):
+    __tablename__ = "equity_fit_scores"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    equity_bet_id = Column(String, ForeignKey("equity_bets.id"), nullable=False, unique=True)
+    thesis_id = Column(String, ForeignKey("theses.id"), nullable=True)
+    effect_id = Column(String, ForeignKey("effects.id"), nullable=True)
+
+    revenue_alignment_score = Column(Float, default=50.0)
+    thesis_beta_score = Column(Float, default=50.0)
+    momentum_alignment_score = Column(Float, default=50.0)
+    valuation_buffer_score = Column(Float, default=50.0)
+    signal_purity_score = Column(Float, default=50.0)
+    efs_score = Column(Float, default=50.0)
+
+    revenue_alignment_pct = Column(Float, nullable=True)
+    forward_pe = Column(Float, nullable=True)
+    sector_median_pe = Column(Float, nullable=True)
+    segment_count = Column(Integer, nullable=True)
+    thesis_beta_raw = Column(Float, nullable=True)
+    momentum_direction = Column(String, nullable=True)
+    stock_return_90d = Column(Float, nullable=True)
+    thi_delta_90d = Column(Float, nullable=True)
+
+    last_updated = Column(DateTime, default=datetime.utcnow)
+    data_sources_used = Column(JSON, default=list)
+
+    equity_bet = relationship("EquityBet", backref="fit_score")
+
+
+class StartupTimingScore(Base):
+    __tablename__ = "startup_timing_scores"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    startup_opp_id = Column(String, ForeignKey("startup_opportunities.id"), nullable=False, unique=True)
+
+    thi_alignment_score = Column(Float, default=50.0)
+    thi_velocity_score = Column(Float, default=50.0)
+    competition_density_score = Column(Float, default=50.0)
+    sts_score = Column(Float, default=50.0)
+
+    competitor_count = Column(Integer, nullable=True)
+    funded_startups_in_category = Column(Integer, nullable=True)
+    total_funding_in_category = Column(Float, nullable=True)
+    timing_label = Column(String, default="RIGHT_TIMING")
+
+    last_updated = Column(DateTime, default=datetime.utcnow)
+
+    startup_opportunity = relationship("StartupOpportunity", backref="timing_score")

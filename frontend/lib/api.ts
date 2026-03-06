@@ -106,6 +106,13 @@ export const api = {
   deletePosition: (positionId: string) =>
     request(`/portfolio/positions/${positionId}`, { method: "DELETE" }),
 
+  // EFS / STS
+  getThesisEquityScores: (thesisId: string) => request<EquityScoreResult[]>(`/theses/${thesisId}/equity-scores`),
+  refreshThesisEquityScores: (thesisId: string) => request(`/theses/${thesisId}/equity-scores/refresh`, { method: "POST" }),
+  getBetEFS: (betId: string) => request<{ betId: string; ticker: string; efs: EFSScore | null }>(`/equity-bet/${betId}/efs`),
+  getStartupSTS: (oppId: string) => request<{ oppId: string; name: string; sts: STSScore | null }>(`/startup/${oppId}/sts`),
+  getEffectEquityScores: (effectId: string) => request<EquityScoreResult[]>(`/effects/${effectId}/equity-scores`),
+
   // Macro
   getMacroHeader: () => request<MacroHeader>("/macro/header"),
 };
@@ -375,4 +382,49 @@ export interface PositionUpdateInput {
   current_price?: number;
   is_closed?: boolean;
   close_price?: number;
+}
+
+export interface EFSScore {
+  id: string;
+  equityBetId: string;
+  thesisId: string;
+  effectId: string | null;
+  revenueAlignmentScore: number;
+  thesisBetaScore: number;
+  momentumAlignmentScore: number;
+  valuationBufferScore: number;
+  signalPurityScore: number;
+  efsScore: number;
+  revenueAlignmentPct: number | null;
+  forwardPE: number | null;
+  sectorMedianPE: number | null;
+  segmentCount: number | null;
+  thesisBetaRaw: number | null;
+  momentumDirection: string | null;
+  stockReturn90d: number | null;
+  thiDelta90d: number | null;
+  lastUpdated: string | null;
+  dataSourcesUsed: string[];
+}
+
+export interface STSScore {
+  id: string;
+  startupOppId: string;
+  thiAlignmentScore: number;
+  thiVelocityScore: number;
+  competitionDensityScore: number;
+  stsScore: number;
+  competitorCount: number | null;
+  fundedStartupsInCategory: number | null;
+  totalFundingInCategory: number | null;
+  timingLabel: string;
+  lastUpdated: string | null;
+}
+
+export interface EquityScoreResult {
+  ticker: string;
+  companyName: string;
+  role: string;
+  betId: string;
+  efs: EFSScore | null;
 }

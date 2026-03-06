@@ -10,7 +10,7 @@ import StartupCard from "@/components/StartupCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ConvictionSlider from "@/components/ConvictionSlider";
 import TrashIcon from "@/components/TrashIcon";
-import { api, ThesisDetail, Effect, ScoringBreakdown, EvidenceDimension, ScoringBreakdownFeed } from "@/lib/api";
+import { api, ThesisDetail, Effect, ScoringBreakdown, EvidenceDimension, ScoringBreakdownFeed, EquityScoreResult, EFSScore, STSScore } from "@/lib/api";
 
 export default function EffectDetailPage() {
   const params = useParams();
@@ -23,16 +23,32 @@ export default function EffectDetailPage() {
   const [scoringOpen, setScoringOpen] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"bets" | "startups">("bets");
+  const [efsScores, setEfsScores] = useState<EquityScoreResult[]>([]);
+  const [stsMap, setStsMap] = useState<Record<string, STSScore>>({});
 
   const reloadEffect = async () => {
-    const [t, e, b] = await Promise.all([
+    const [t, e, b, efs] = await Promise.all([
       api.getThesis(thesisId),
       api.getEffect(effectId),
       api.getEffectScoringBreakdown(effectId).catch(() => null),
+      api.getEffectEquityScores(effectId).catch(() => [] as EquityScoreResult[]),
     ]);
     setThesis(t);
     setEffect(e);
     if (b) setBreakdown(b);
+    setEfsScores(efs);
+    if (e.startupOpportunities.length > 0) {
+      const stsResults = await Promise.all(
+        e.startupOpportunities.map((opp) =>
+          api.getStartupSTS(opp.id).catch(() => null)
+        )
+      );
+      const newStsMap: Record<string, STSScore> = {};
+      stsResults.forEach((r) => {
+        if (r?.sts) newStsMap[r.oppId] = r.sts;
+      });
+      setStsMap(newStsMap);
+    }
   };
 
   const handleRefreshFeeds = async () => {
@@ -53,11 +69,25 @@ export default function EffectDetailPage() {
       api.getThesis(thesisId),
       api.getEffect(effectId),
       api.getEffectScoringBreakdown(effectId).catch(() => null),
+      api.getEffectEquityScores(effectId).catch(() => [] as EquityScoreResult[]),
     ])
-      .then(([t, e, b]) => {
+      .then(async ([t, e, b, efs]) => {
         setThesis(t);
         setEffect(e);
         if (b) setBreakdown(b);
+        setEfsScores(efs);
+        if (e.startupOpportunities.length > 0) {
+          const stsResults = await Promise.all(
+            e.startupOpportunities.map((opp) =>
+              api.getStartupSTS(opp.id).catch(() => null)
+            )
+          );
+          const newStsMap: Record<string, STSScore> = {};
+          stsResults.forEach((r) => {
+            if (r?.sts) newStsMap[r.oppId] = r.sts;
+          });
+          setStsMap(newStsMap);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -251,23 +281,52 @@ export default function EffectDetailPage() {
                 onClick={() => setActiveTab("startups")}
               />
             </div>
-            {activeTab === "bets" && (
-              <CategoryColumns
-                items={effect.equityBets}
-                getRole={(bet) => bet.role}
-                renderItem={(bet) => <EquityBetCard key={bet.id} bet={bet} />}
-                emptyNoun="stocks"
-              />
-            )}
+            {activeTab === "bets" && (() => {
+              const efsMap: Record<string, EFSScore> = {};
+              efsScores.forEach((r) => {
+                if (r.efs) efsMap[r.betId] = r.efs;
+              });
+              const sortedBets = [...effect.equityBets].sort((a, b) => {
+                const aScore = efsMap[a.id]?.efsScore ?? -1;
+                const bScore = efsMap[b.id]?.efsScore ?? -1;
+                return bScore - aScore;
+              });
+              const rankMap: Record<string, number> = {};
+              sortedBets.forEach((bet, i) => {
+                if (efsMap[bet.id]) rankMap[bet.id] = i + 1;
+              });
+              return (
+                <CategoryColumns
+                  items={sortedBets}
+                  getRole={(bet) => bet.role}
+                  renderItem={(bet) => (
+                    <EquityBetCard
+                      key={bet.id}
+                      bet={bet}
+                      efs={efsMap[bet.id] ?? null}
+                      rank={rankMap[bet.id]}
+                    />
+                  )}
+                  emptyNoun="stocks"
+                />
+              );
+            })()}
             {activeTab === "startups" && (
               <CategoryColumns
                 items={effect.startupOpportunities}
                 getRole={(opp) => {
-                  if (opp.timing === "RIGHT_TIMING") return "BENEFICIARY";
-                  if (opp.timing === "TOO_EARLY") return "HEADWIND";
+                  const timing = stsMap[opp.id]?.timingLabel ?? opp.timing;
+                  if (timing === "RIGHT_TIMING") return "BENEFICIARY";
+                  if (timing === "TOO_EARLY") return "HEADWIND";
                   return "CANARY";
                 }}
-                renderItem={(opp) => <StartupCard key={opp.id} opportunity={opp} />}
+                renderItem={(opp) => (
+                  <StartupCard
+                    key={opp.id}
+                    opportunity={opp}
+                    sts={stsMap[opp.id] ?? null}
+                  />
+                )}
                 emptyNoun="startups"
               />
             )}
