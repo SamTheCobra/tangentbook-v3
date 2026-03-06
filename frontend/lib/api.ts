@@ -75,6 +75,9 @@ export const api = {
   deleteOpportunity: (id: string) =>
     request(`/opportunities/${id}`, { method: "DELETE" }),
 
+  // Scoring
+  getScoringBreakdown: (thesisId: string) => request<ScoringBreakdown>(`/theses/${thesisId}/scoring-breakdown`),
+
   // Feeds
   getFeeds: (thesisId: string) => request<Feed[]>(`/theses/${thesisId}/feeds`),
   refreshFeeds: (thesisId: string) =>
@@ -196,6 +199,44 @@ export interface MacroHeader {
   tenYearTwoYearSpread: number | null;
   vix: number | null;
   lastUpdated: string | null;
+}
+
+export interface ScoringBreakdownFeed {
+  name: string;
+  value: number | null;
+  normalizedScore: number | null;
+  status: string;
+  lastUpdated: string | null;
+}
+
+export interface EvidenceDimension {
+  weight: number;
+  description: string;
+  score: number | null;
+  feeds: ScoringBreakdownFeed[];
+  lastUpdated: string | null;
+}
+
+export interface ScoringBreakdown {
+  evidence: {
+    score: number;
+    flow: EvidenceDimension;
+    structural: EvidenceDimension;
+    adoption: EvidenceDimension;
+    policy: EvidenceDimension;
+  };
+  momentum: {
+    score: number;
+    thirtyDay: { delta: number | null; score: number };
+    ninetyDay: { delta: number | null; score: number };
+    oneYear: { delta: number | null; score: number };
+  };
+  dataQuality: {
+    score: number;
+    agreement: { pctConfirming: number | null; score: number };
+    freshness: { avgAgeDays: number | null; live: number; stale: number; degraded: number; offline: number; score: number };
+    sourceQuality: { weightedAvg: number; score: number };
+  };
 }
 
 export interface ThesisCreateInput {
