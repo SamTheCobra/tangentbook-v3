@@ -99,7 +99,7 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
 
         {/* Footer: Feedback + Time horizon */}
         <div className="mt-3 flex items-center gap-3">
-          {bet.isFeedbackIndicator && (
+          {bet.role === "CANARY" && (
             <span
               className="uppercase"
               style={{
