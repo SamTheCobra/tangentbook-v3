@@ -10,6 +10,7 @@ import StartupCard from "@/components/StartupCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import EffectChain from "@/components/EffectChain";
 import ConvictionSlider from "@/components/ConvictionSlider";
+import TrashIcon from "@/components/TrashIcon";
 import { api, ThesisDetail, Feed, Effect } from "@/lib/api";
 
 export default function ThesisDetailPage() {
@@ -280,7 +281,7 @@ export default function ThesisDetailPage() {
           </>
         )}
 
-        {/* Effects Grid */}
+        {/* Effects Grid with 3rd order toggle */}
         <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
         <div className="flex items-center justify-between mb-4">
           <h3
@@ -296,6 +297,35 @@ export default function ThesisDetailPage() {
             <EffectCard key={effect.id} effect={effect} thesisId={thesis.id} onUpdated={reloadThesis} />
           ))}
         </div>
+
+        {/* 4th order note */}
+        <div className="mt-6 mb-8 flex items-center gap-3">
+          <span
+            style={{
+              color: "var(--text-muted)",
+              fontSize: "12px",
+              letterSpacing: "0.04em",
+              fontFamily: "JetBrains Mono, monospace",
+            }}
+          >
+            4th order effects available via AI generation →
+          </span>
+          <button
+            disabled
+            className="uppercase px-3 py-1 border"
+            style={{
+              color: "var(--text-muted)",
+              borderColor: "var(--border)",
+              letterSpacing: "0.08em",
+              background: "none",
+              cursor: "not-allowed",
+              fontSize: "11px",
+              opacity: 0.5,
+            }}
+          >
+            COMING SOON
+          </button>
+        </div>
       </div>
     </main>
     </ErrorBoundary>
@@ -303,9 +333,7 @@ export default function ThesisDetailPage() {
 }
 
 function formatFeedName(feed: Feed): string {
-  // Clean up auto-generated names like "Fred M2 Money Supply" → "M2 Money Supply"
   let name = feed.name;
-  // Remove source prefix if present
   name = name.replace(/^(Fred|Gtrends|Alpha Vantage)\s+/i, "");
   return name;
 }
@@ -339,7 +367,6 @@ function ScoreColumn({
       className="border p-5"
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
-      {/* Label + weight + score */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span
@@ -357,7 +384,7 @@ function ScoreColumn({
         </div>
         <span
           style={{
-            color: "#E8440A",
+            color: "var(--accent)",
             fontFamily: "JetBrains Mono, monospace",
             fontSize: "20px",
             fontWeight: "bold",
@@ -367,12 +394,10 @@ function ScoreColumn({
         </span>
       </div>
 
-      {/* Needle */}
       <div className="flex justify-center mb-3">
         <Needle score={score} size="sm" label="" animated={true} />
       </div>
 
-      {/* Description */}
       <p
         style={{
           color: "var(--text-muted)",
@@ -384,7 +409,6 @@ function ScoreColumn({
         {description}
       </p>
 
-      {/* Sub-breakdowns */}
       <div className="flex flex-col gap-2">
         {breakdowns.map((b) => (
           <div key={b.label} className="flex items-center gap-3">
@@ -403,7 +427,7 @@ function ScoreColumn({
               style={{
                 width: "40px",
                 height: "4px",
-                background: "#2A2A2A",
+                background: "var(--border)",
                 position: "relative",
                 flexShrink: 0,
               }}
@@ -412,7 +436,7 @@ function ScoreColumn({
                 style={{
                   width: `${b.pct}%`,
                   height: "100%",
-                  background: "#E8440A",
+                  background: "var(--accent)",
                 }}
               />
             </div>
@@ -566,28 +590,24 @@ function FeedPanel({
                   background: "var(--surface)",
                 }}
               >
-                {/* Main row */}
                 <button
                   onClick={() => setExpandedFeed(isExpanded ? null : feed.id)}
                   className="w-full px-4 py-3 flex items-center gap-4 text-left"
                   style={{ background: "none", border: "none", cursor: "pointer" }}
                 >
-                  {/* Expand indicator */}
                   <span style={{ color: "var(--text-muted)", fontSize: "11px", width: "12px", flexShrink: 0 }}>
                     {isExpanded ? "−" : "+"}
                   </span>
 
-                  {/* Name + Series ID */}
                   <div className="flex-1 min-w-0">
                     <span style={{ color: "var(--text)", fontSize: "14px", display: "block" }}>
                       {formatFeedName(feed)}
                     </span>
-                    <span style={{ color: "#4A4A4A", fontSize: "11px", fontFamily: "JetBrains Mono, monospace" }}>
+                    <span style={{ color: "#3A3A3A", fontSize: "11px", fontFamily: "JetBrains Mono, monospace" }}>
                       {feed.seriesId || feed.keyword || feed.source}
                     </span>
                   </div>
 
-                  {/* Raw value */}
                   <span
                     className="flex-shrink-0"
                     style={{
@@ -601,13 +621,12 @@ function FeedPanel({
                     {formatRawValue(feed)}
                   </span>
 
-                  {/* Normalized score + bar */}
                   <div className="flex items-center gap-2 flex-shrink-0" style={{ width: "100px" }}>
                     <div
                       style={{
                         width: "60px",
                         height: "6px",
-                        background: "#1E1B18",
+                        background: "var(--surface-alt)",
                         position: "relative",
                       }}
                     >
@@ -616,14 +635,14 @@ function FeedPanel({
                           style={{
                             width: `${Math.min(score, 100)}%`,
                             height: "100%",
-                            background: "#E8440A",
+                            background: "var(--accent)",
                           }}
                         />
                       )}
                     </div>
                     <span
                       style={{
-                        color: score != null ? "#E8440A" : "var(--text-muted)",
+                        color: score != null ? "var(--accent)" : "var(--text-muted)",
                         fontFamily: "JetBrains Mono, monospace",
                         fontSize: "13px",
                         minWidth: "24px",
@@ -634,7 +653,6 @@ function FeedPanel({
                     </span>
                   </div>
 
-                  {/* Last updated */}
                   <span
                     className="flex-shrink-0"
                     style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "11px", minWidth: "80px", textAlign: "right" }}
@@ -642,11 +660,9 @@ function FeedPanel({
                     {feed.lastFetched ? new Date(feed.lastFetched).toLocaleDateString() : "——"}
                   </span>
 
-                  {/* Status badge */}
                   <FeedStatusBadge status={feed.status} />
                 </button>
 
-                {/* Expanded detail */}
                 {isExpanded && (
                   <div
                     className="px-4 pb-3 pl-10"
@@ -654,7 +670,7 @@ function FeedPanel({
                   >
                     <div className="grid grid-cols-2 gap-x-6 gap-y-2" style={{ maxWidth: "600px" }}>
                       <div>
-                        <span className="uppercase block" style={{ color: "#4A4A4A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                        <span className="uppercase block" style={{ color: "#3A3A3A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
                           SOURCE
                         </span>
                         <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>
@@ -662,7 +678,7 @@ function FeedPanel({
                         </span>
                       </div>
                       <div>
-                        <span className="uppercase block" style={{ color: "#4A4A4A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                        <span className="uppercase block" style={{ color: "#3A3A3A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
                           CONFIRMING DIRECTION
                         </span>
                         <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>
@@ -670,7 +686,7 @@ function FeedPanel({
                         </span>
                       </div>
                       <div>
-                        <span className="uppercase block" style={{ color: "#4A4A4A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                        <span className="uppercase block" style={{ color: "#3A3A3A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
                           WEIGHT
                         </span>
                         <span style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
@@ -678,7 +694,7 @@ function FeedPanel({
                         </span>
                       </div>
                       <div>
-                        <span className="uppercase block" style={{ color: "#4A4A4A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                        <span className="uppercase block" style={{ color: "#3A3A3A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
                           UPDATE FREQ
                         </span>
                         <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>
@@ -703,19 +719,19 @@ function FeedPanel({
 }
 
 function FeedStatusBadge({ status }: { status: string }) {
-  const config: Record<string, { color: string; bg: string }> = {
-    live: { color: "var(--positive)", bg: "transparent" },
-    stale: { color: "var(--text-muted)", bg: "transparent" },
-    degraded: { color: "#E8440A", bg: "transparent" },
-    offline: { color: "#6B3A3A", bg: "transparent" },
+  const config: Record<string, string> = {
+    live: "var(--status-live)",
+    stale: "var(--status-stale)",
+    degraded: "var(--status-degraded)",
+    offline: "var(--status-offline)",
   };
-  const c = config[status] || config.stale;
+  const color = config[status] || config.stale;
 
   return (
     <span
       className="uppercase flex-shrink-0"
       style={{
-        color: c.color,
+        color,
         letterSpacing: "0.08em",
         fontSize: "11px",
         minWidth: "60px",
@@ -728,6 +744,8 @@ function FeedStatusBadge({ status }: { status: string }) {
 }
 
 function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId: string; onUpdated: () => void }) {
+  const [show3rd, setShow3rd] = useState(false);
+
   const handleDelete = async () => {
     if (!confirm(`Delete "${effect.title}"? This cannot be undone.`)) return;
     await api.deleteEffect(effect.id);
@@ -749,10 +767,10 @@ function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId:
             <button
               onClick={handleDelete}
               className="ml-1 flex-shrink-0"
-              style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
+              style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
               title="Delete effect"
             >
-              x
+              <TrashIcon size={14} />
             </button>
           </div>
           <p className="mt-1" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
@@ -795,8 +813,59 @@ function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId:
         </div>
       )}
 
+      {/* 3rd order effects toggle */}
+      {effect.childEffects && effect.childEffects.length > 0 && (
+        <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+          <button
+            onClick={() => setShow3rd(!show3rd)}
+            className="uppercase flex items-center gap-1"
+            style={{
+              color: "var(--text-muted)",
+              letterSpacing: "0.08em",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "11px",
+            }}
+          >
+            {show3rd ? "▼" : "▶"} SHOW 3RD ORDER EFFECTS ({effect.childEffects.length})
+          </button>
+          {show3rd && (
+            <div className="mt-2 pl-4" style={{ borderLeft: "1px solid var(--border)" }}>
+              {effect.childEffects.map((child) => (
+                <div key={child.id} className="mb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 mr-3">
+                      <h4
+                        className="font-bold uppercase"
+                        style={{ color: "var(--text)", letterSpacing: "-0.03em", lineHeight: "1.3", fontSize: "13px" }}
+                      >
+                        {child.title}
+                      </h4>
+                      <p className="mt-1" style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "13px" }}>
+                        {child.description}
+                      </p>
+                      {child.equityBets && child.equityBets.length > 0 && (
+                        <div className="mt-1">
+                          {child.equityBets.map((bet) => (
+                            <span key={bet.id} className="mr-2" style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>
+                              {bet.ticker}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Needle score={child.thi.score} size="sm" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* CTAs for empty sections */}
-      {effect.equityBets.length === 0 && effect.startupOpportunities.length === 0 && (
+      {effect.equityBets.length === 0 && effect.startupOpportunities.length === 0 && (!effect.childEffects || effect.childEffects.length === 0) && (
         <div className="mt-3 pt-3 flex gap-4" style={{ borderTop: "1px solid var(--border)" }}>
           <span className="uppercase" style={{ color: "var(--text-muted)", fontSize: "12px", letterSpacing: "0.08em", opacity: 0.6 }}>
             + Add equity bet
@@ -873,11 +942,10 @@ function AddEffectButton({ thesisId, onCreated }: { thesisId: string; onCreated:
       </button>
       <button
         onClick={() => setOpen(false)}
-        style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}
+        style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
       >
-        x
+        <TrashIcon size={14} />
       </button>
     </div>
   );
 }
-

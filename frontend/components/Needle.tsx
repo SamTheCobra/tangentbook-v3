@@ -94,7 +94,7 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     for (let i = 0; i <= 100; i++) {
       const t = i / 100;
       const eased = t < fullAt ? Math.pow(t / fullAt, 3) * maxOpacity : maxOpacity;
-      grad.addColorStop(t, `rgba(232,68,10,${eased.toFixed(4)})`);
+      grad.addColorStop(t, `rgba(255,69,0,${eased.toFixed(4)})`);
     }
     ctx.fillStyle = grad;
     ctx.fill();
@@ -122,7 +122,7 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(nx, ny);
-    ctx.strokeStyle = "#E8440A";
+    ctx.strokeStyle = "#FF4500";
     ctx.lineWidth = lineW;
     ctx.lineCap = "round";
     ctx.stroke();
@@ -130,18 +130,18 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     // PIVOT DOT
     ctx.beginPath();
     ctx.arc(cx, cy, pivotR, 0, Math.PI * 2);
-    ctx.fillStyle = "#E8440A";
+    ctx.fillStyle = "#FF4500";
     ctx.fill();
 
     // TIP DOT
     ctx.beginPath();
     ctx.arc(nx, ny, tipR, 0, Math.PI * 2);
-    ctx.fillStyle = "#E8440A";
+    ctx.fillStyle = "#FF4500";
     ctx.fill();
 
     // SCORE TEXT
     ctx.font = `bold ${cfg.fontSize}px "JetBrains Mono", monospace`;
-    ctx.fillStyle = "#E8440A";
+    ctx.fillStyle = "#FF4500";
     ctx.textAlign = "center";
     ctx.fillText(Math.round(displayScore).toString(), cx, cy + cfg.fontSize + (size === "lg" ? 12 : 6));
   }, [displayScore, size]);
@@ -174,7 +174,7 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
       <div
         className="text-center uppercase"
         style={{
-          color: "#6B6B6B",
+          color: "#5A5A5A",
           letterSpacing: "0.08em",
           fontSize: size === "lg" ? "12px" : size === "md" ? "11px" : "9px",
           fontFamily: "Inter, system-ui, sans-serif",
@@ -192,7 +192,7 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
           style={{
             fontFamily: "JetBrains Mono, monospace",
             fontSize: "11px",
-            color: "#6B6B6B",
+            color: "#5A5A5A",
             letterSpacing: "-0.02em",
             maxWidth: cfg.width + 60,
             lineHeight: "1.4",

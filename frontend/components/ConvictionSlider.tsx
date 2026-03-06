@@ -43,6 +43,11 @@ export default function ConvictionSlider({
     setNote("");
   };
 
+  const handleReset = () => {
+    setValue(7);
+    onUpdate(7, "Reset to default");
+  };
+
   return (
     <div>
       <div className="flex items-center gap-3">
@@ -78,8 +83,34 @@ export default function ConvictionSlider({
           {value}/10
         </span>
         {history.length > 1 && (
-          <Sparkline data={history} width={48} height={16} />
+          <div className="flex flex-col items-center">
+            <Sparkline data={history} width={48} height={16} />
+            <span
+              style={{
+                color: "var(--text-muted)",
+                fontSize: "8px",
+                letterSpacing: "0.04em",
+                marginTop: "1px",
+              }}
+            >
+              YOUR CONVICTION HISTORY
+            </span>
+          </div>
         )}
+        <button
+          onClick={handleReset}
+          className="uppercase"
+          style={{
+            color: "var(--text-muted)",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: "11px",
+            letterSpacing: "0.06em",
+          }}
+        >
+          RESET TO DEFAULT
+        </button>
       </div>
 
       {showNote && (

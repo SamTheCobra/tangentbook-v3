@@ -32,8 +32,8 @@ export default function StartupCard({ opportunity }: StartupCardProps) {
               key={timing}
               className="uppercase px-2 py-0.5 border"
               style={{
-                color: isActive ? "#E8440A" : "#3A3A3A",
-                borderColor: isActive ? "#E8440A" : "#2A2A2A",
+                color: isActive ? "var(--accent)" : "#333",
+                borderColor: isActive ? "var(--accent)" : "var(--border)",
                 letterSpacing: "0.08em",
                 fontSize: "11px",
               }}

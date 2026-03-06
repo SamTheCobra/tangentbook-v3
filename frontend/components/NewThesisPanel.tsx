@@ -84,7 +84,7 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
               onClick={onClose}
               style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "18px" }}
             >
-              x
+              ✕
             </button>
           </div>
 

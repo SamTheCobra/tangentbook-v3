@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Needle from "@/components/Needle";
@@ -19,6 +19,8 @@ export default function Home() {
   const [sort, setSort] = useState<SortMode>("order");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const tagDropdownRef = useRef<HTMLDivElement>(null);
 
   const loadTheses = useCallback(() => {
     api
@@ -31,6 +33,19 @@ export default function Home() {
   useEffect(() => {
     loadTheses();
   }, [loadTheses]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
+        setTagDropdownOpen(false);
+      }
+    };
+    if (tagDropdownOpen) {
+      document.addEventListener("mousedown", handleClick);
+      return () => document.removeEventListener("mousedown", handleClick);
+    }
+  }, [tagDropdownOpen]);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -106,42 +121,6 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
-                <div className="flex flex-wrap gap-2 mb-3" style={{ maxWidth: "100%" }}>
-                  {allTags.map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
-                      className="uppercase"
-                      style={{
-                        color: tagFilter === tag ? "var(--accent)" : "var(--text-muted)",
-                        letterSpacing: "0.08em",
-                        background: "none",
-                        border: tagFilter === tag ? "1px solid var(--accent)" : "1px solid var(--border)",
-                        cursor: "pointer",
-                        fontSize: "11px",
-                        padding: "2px 8px",
-                      }}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                  {tagFilter && (
-                    <button
-                      onClick={() => setTagFilter(null)}
-                      className="uppercase"
-                      style={{
-                        color: "var(--text-muted)",
-                        letterSpacing: "0.08em",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: "11px",
-                      }}
-                    >
-                      CLEAR
-                    </button>
-                  )}
-                </div>
 
                 <div className="flex items-center gap-3">
                   <span className="uppercase" style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}>
@@ -171,6 +150,90 @@ export default function Home() {
                       {s.label}
                     </button>
                   ))}
+
+                  {/* Tag filter dropdown */}
+                  {allTags.length > 0 && (
+                    <div ref={tagDropdownRef} className="relative">
+                      <button
+                        onClick={() => setTagDropdownOpen(!tagDropdownOpen)}
+                        className="uppercase flex items-center gap-1"
+                        style={{
+                          color: tagFilter ? "var(--accent)" : "var(--text-muted)",
+                          letterSpacing: "0.08em",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                        }}
+                      >
+                        FILTER BY TAG {tagDropdownOpen ? "▴" : "▾"}
+                      </button>
+
+                      {tagFilter && (
+                        <span
+                          className="uppercase ml-2 px-2 py-0.5 border inline-flex items-center gap-1"
+                          style={{
+                            color: "var(--accent)",
+                            borderColor: "var(--accent)",
+                            fontSize: "10px",
+                            letterSpacing: "0.06em",
+                          }}
+                        >
+                          {tagFilter}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setTagFilter(null); }}
+                            style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontSize: "10px" }}
+                          >
+                            x
+                          </button>
+                        </span>
+                      )}
+
+                      {tagDropdownOpen && (
+                        <div
+                          className="absolute top-full left-0 mt-1 border z-50"
+                          style={{
+                            background: "var(--surface)",
+                            borderColor: "var(--border)",
+                            minWidth: "180px",
+                            maxHeight: "300px",
+                            overflowY: "auto",
+                          }}
+                        >
+                          {allTags.map((tag) => (
+                            <button
+                              key={tag}
+                              onClick={() => {
+                                setTagFilter(tagFilter === tag ? null : tag);
+                                setTagDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-2 uppercase flex items-center gap-2"
+                              style={{
+                                background: tagFilter === tag ? "var(--surface-alt)" : "transparent",
+                                border: "none",
+                                color: tagFilter === tag ? "var(--accent)" : "var(--text-muted)",
+                                fontSize: "11px",
+                                letterSpacing: "0.08em",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  width: "10px",
+                                  height: "10px",
+                                  border: `1px solid ${tagFilter === tag ? "var(--accent)" : "var(--border)"}`,
+                                  background: tagFilter === tag ? "var(--accent)" : "transparent",
+                                  display: "inline-block",
+                                  flexShrink: 0,
+                                }}
+                              />
+                              {tag}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -202,8 +265,8 @@ function ThesisCard({ thesis }: { thesis: Thesis }) {
       href={`/thesis/${thesis.id}`}
       className="block"
       style={{
-        background: "#1A1A1A",
-        border: `1px solid ${hovered ? "#E8440A" : "#2A2A2A"}`,
+        background: "#161616",
+        border: `1px solid ${hovered ? "var(--accent)" : "var(--border)"}`,
         padding: "28px",
         minHeight: "160px",
         textDecoration: "none",
@@ -217,7 +280,7 @@ function ThesisCard({ thesis }: { thesis: Thesis }) {
           <h2
             className="font-bold uppercase"
             style={{
-              color: "#F5F3EE",
+              color: "var(--text)",
               fontFamily: "Inter, system-ui, sans-serif",
               fontSize: "20px",
               letterSpacing: "-0.03em",
@@ -229,7 +292,7 @@ function ThesisCard({ thesis }: { thesis: Thesis }) {
           <p
             className="mt-2"
             style={{
-              color: "#6B6B6B",
+              color: "var(--text-muted)",
               fontSize: "14px",
               lineHeight: "1.5",
             }}

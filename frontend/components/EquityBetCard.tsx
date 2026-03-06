@@ -1,6 +1,7 @@
 "use client";
 
 import { EquityBet } from "@/lib/api";
+import StockSparkline from "./StockSparkline";
 
 const ALL_ROLES = ["BENEFICIARY", "HEADWIND", "CANARY"] as const;
 
@@ -14,12 +15,12 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
       className="border p-5"
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
-      {/* Row 1: Ticker + Role badges */}
+      {/* Row 1: Ticker + Role badges + Sparkline */}
       <div className="flex items-center gap-3 mb-1">
         <span
           className="font-bold"
           style={{
-            color: "#E8440A",
+            color: "var(--accent)",
             fontFamily: "JetBrains Mono, monospace",
             fontSize: "24px",
             letterSpacing: "-0.02em",
@@ -35,8 +36,8 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
                 key={role}
                 className="uppercase px-2 py-0.5 border"
                 style={{
-                  color: isActive ? "#E8440A" : "#3A3A3A",
-                  borderColor: isActive ? "#E8440A" : "#2A2A2A",
+                  color: isActive ? "var(--accent)" : "#333",
+                  borderColor: isActive ? "var(--accent)" : "var(--border)",
                   letterSpacing: "0.08em",
                   fontSize: "11px",
                 }}
@@ -45,6 +46,9 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
               </span>
             );
           })}
+        </div>
+        <div className="ml-auto flex-shrink-0">
+          <StockSparkline ticker={bet.ticker} role={bet.role} />
         </div>
       </div>
 
@@ -60,7 +64,7 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
         {bet.companyName}
       </div>
 
-      {/* Row 3: Company description (what it does + why it fits) */}
+      {/* Row 3: Company description */}
       {bet.companyDescription && (
         <p
           className="mb-3"
@@ -76,7 +80,7 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
         </p>
       )}
 
-      {/* Row 4: Rationale (thesis-specific reasoning) */}
+      {/* Row 4: Rationale */}
       <p
         style={{
           color: "var(--text-muted)",
@@ -95,7 +99,7 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
           <span
             className="uppercase"
             style={{
-              color: "#E8440A",
+              color: "var(--accent)",
               letterSpacing: "0.08em",
               fontSize: "11px",
             }}
