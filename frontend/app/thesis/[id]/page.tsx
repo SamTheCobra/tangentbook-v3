@@ -157,8 +157,8 @@ export default function ThesisDetailPage() {
         <div className="mb-8" style={{ borderTop: "1px solid var(--border)" }} />
 
         {/* Sub-needles row */}
-        <div className="flex gap-12 mb-8">
-          <div className="text-center">
+        <div className="flex gap-12 mb-8" style={{ overflow: "visible" }}>
+          <div className="text-center" style={{ overflow: "visible" }}>
             <Needle
               score={thesis.thi.evidence.score}
               size="md"
@@ -166,13 +166,13 @@ export default function ThesisDetailPage() {
               formulaText="Flow(35%) + Structural(30%) + Adoption(20%) + Policy(15%)"
             />
             <span
-              className="uppercase mt-1 block"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}
+              className="uppercase block"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px", marginTop: "2px" }}
             >
               WEIGHT {(thesis.thi.evidence.weight * 100).toFixed(0)}%
             </span>
           </div>
-          <div className="text-center">
+          <div className="text-center" style={{ overflow: "visible" }}>
             <Needle
               score={thesis.thi.momentum.score}
               size="md"
@@ -180,13 +180,13 @@ export default function ThesisDetailPage() {
               formulaText="Short(50%) + Medium(35%) + Long(15%) rate-of-change"
             />
             <span
-              className="uppercase mt-1 block"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}
+              className="uppercase block"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px", marginTop: "2px" }}
             >
               WEIGHT {(thesis.thi.momentum.weight * 100).toFixed(0)}%
             </span>
           </div>
-          <div className="text-center">
+          <div className="text-center" style={{ overflow: "visible" }}>
             <Needle
               score={thesis.thi.conviction.score}
               size="md"
@@ -194,8 +194,8 @@ export default function ThesisDetailPage() {
               formulaText="Agreement(50%) + Freshness(30%) + Source(20%)"
             />
             <span
-              className="uppercase mt-1 block"
-              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px" }}
+              className="uppercase block"
+              style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "12px", marginTop: "2px" }}
             >
               WEIGHT {(thesis.thi.conviction.weight * 100).toFixed(0)}%
             </span>

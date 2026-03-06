@@ -11,9 +11,9 @@ interface NeedleProps {
 }
 
 const SIZES = {
-  sm: { width: 120, height: 72, needleLen: 42, fontSize: 14, labelSize: 9, strokeWidth: 1.5 },
-  md: { width: 200, height: 120, needleLen: 72, fontSize: 20, labelSize: 10, strokeWidth: 2 },
-  lg: { width: 400, height: 240, needleLen: 150, fontSize: 36, labelSize: 12, strokeWidth: 2.5 },
+  sm: { width: 120, height: 72, needleLen: 42, fontSize: 14, strokeWidth: 1.5 },
+  md: { width: 200, height: 120, needleLen: 72, fontSize: 20, strokeWidth: 2 },
+  lg: { width: 400, height: 240, needleLen: 150, fontSize: 36, strokeWidth: 2.5 },
 };
 
 function getComputedCSSVar(name: string): string {
@@ -133,7 +133,7 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     ctx.fillStyle = accent;
     ctx.fill();
 
-    // Labels: REFUTED / CONFIRMED
+    // REFUTED / CONFIRMED labels on canvas
     if (size !== "sm") {
       const labelFontSize = size === "lg" ? 11 : 9;
       ctx.font = `${labelFontSize}px Inter, system-ui, sans-serif`;
@@ -150,14 +150,7 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
     ctx.fillStyle = accent;
     ctx.textAlign = "center";
     ctx.fillText(Math.round(displayScore).toString(), cx, cy + cfg.fontSize + (size === "lg" ? 12 : 6));
-
-    // Label
-    const labelY = cy + cfg.fontSize + (size === "lg" ? 28 : size === "md" ? 18 : 14);
-    ctx.font = `${cfg.labelSize}px Inter, system-ui, sans-serif`;
-    ctx.fillStyle = muted;
-    ctx.textAlign = "center";
-    ctx.fillText(label, cx, labelY);
-  }, [displayScore, size, label]);
+  }, [displayScore, size]);
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -172,23 +165,61 @@ export default function Needle({ score, size = "md", label = "THI", animated = t
 
   const cfg = SIZES[size];
 
+  // Glow dimensions: center at pivot point (bottom-center of semicircle)
+  const glowCx = cfg.width / 2;
+  const glowCy = cfg.height * 0.72;
+  const glowRadius = size === "lg" ? 180 : size === "md" ? 100 : 55;
+  const glowOpacity = size === "lg" ? 0.14 : size === "md" ? 0.15 : 0.12;
+
   return (
-    <div className="flex flex-col items-center">
-      <canvas
-        ref={canvasRef}
-        style={{ width: cfg.width, height: cfg.height }}
-        className="block"
-      />
+    <div
+      className="flex flex-col items-center"
+      style={{ overflow: "visible", paddingBottom: size === "lg" ? "24px" : size === "md" ? "20px" : "8px" }}
+    >
+      {/* Canvas with radial glow background */}
+      <div
+        style={{
+          position: "relative",
+          width: cfg.width,
+          height: cfg.height,
+          overflow: "visible",
+          background: `radial-gradient(circle at ${glowCx}px ${glowCy}px, rgba(232, 68, 10, ${glowOpacity}) 0%, rgba(232, 68, 10, 0) ${glowRadius}px)`,
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          style={{ width: cfg.width, height: cfg.height, position: "relative", zIndex: 1 }}
+          className="block"
+        />
+      </div>
+
+      {/* Label — rendered as HTML, fully visible */}
+      <div
+        className="text-center uppercase"
+        style={{
+          color: "#6B6B6B",
+          letterSpacing: "0.08em",
+          fontSize: size === "lg" ? "12px" : size === "md" ? "11px" : "9px",
+          fontFamily: "Inter, system-ui, sans-serif",
+          marginTop: size === "lg" ? "8px" : "4px",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </div>
+
+      {/* Formula text */}
       {formulaText && (
         <div
-          className="mt-1 text-center"
+          className="text-center"
           style={{
             fontFamily: "JetBrains Mono, monospace",
             fontSize: "11px",
             color: "#6B6B6B",
             letterSpacing: "-0.02em",
-            maxWidth: cfg.width + 40,
+            maxWidth: cfg.width + 60,
             lineHeight: "1.4",
+            marginTop: "4px",
           }}
         >
           {formulaText}
