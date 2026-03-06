@@ -36,8 +36,8 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
                 key={role}
                 className="uppercase px-2 py-0.5 border"
                 style={{
-                  color: isActive ? "var(--accent)" : "#333",
-                  borderColor: isActive ? "var(--accent)" : "var(--border)",
+                  color: isActive ? "#FF4500" : "#242424",
+                  borderColor: isActive ? "#FF4500" : "#242424",
                   letterSpacing: "0.08em",
                   fontSize: "11px",
                 }}

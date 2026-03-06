@@ -53,7 +53,7 @@ export default function StockSparkline({ ticker, role }: StockSparklineProps) {
   const h = 32;
 
   const isUp = data[data.length - 1] > data[0];
-  const color = isUp ? "#22C55E" : "#EF4444";
+  const color = isUp ? "#FF4500" : "#5A5A5A";
 
   const points = data
     .map((v, i) => {
@@ -66,10 +66,11 @@ export default function StockSparkline({ ticker, role }: StockSparklineProps) {
   return (
     <div
       className="relative"
+      style={{ width: w, maxWidth: w, overflow: "hidden" }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <svg width={w} height={h}>
+      <svg width={w} height={h} style={{ display: "block" }}>
         <polyline
           points={points}
           fill="none"
@@ -78,24 +79,13 @@ export default function StockSparkline({ ticker, role }: StockSparklineProps) {
           strokeLinejoin="round"
         />
       </svg>
-      <div
-        style={{
-          color: "#5A5A5A",
-          fontSize: "8px",
-          letterSpacing: "0.04em",
-          marginTop: "2px",
-        }}
-      >
-        SIMULATED
-      </div>
 
       {hovered && (
         <div
           style={{
             position: "absolute",
             bottom: "100%",
-            left: "50%",
-            transform: "translateX(-50%)",
+            right: 0,
             background: "#161616",
             border: "1px solid #242424",
             padding: "4px 8px",

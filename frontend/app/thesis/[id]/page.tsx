@@ -603,7 +603,7 @@ function FeedPanel({
                     <span style={{ color: "var(--text)", fontSize: "14px", display: "block" }}>
                       {formatFeedName(feed)}
                     </span>
-                    <span style={{ color: "#3A3A3A", fontSize: "11px", fontFamily: "JetBrains Mono, monospace" }}>
+                    <span style={{ color: "#242424", fontSize: "11px", fontFamily: "JetBrains Mono, monospace" }}>
                       {feed.seriesId || feed.keyword || feed.source}
                     </span>
                   </div>
@@ -670,7 +670,7 @@ function FeedPanel({
                   >
                     <div className="grid grid-cols-2 gap-x-6 gap-y-2" style={{ maxWidth: "600px" }}>
                       <div>
-                        <span className="uppercase block" style={{ color: "#3A3A3A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                        <span className="uppercase block" style={{ color: "#242424", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
                           SOURCE
                         </span>
                         <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>
@@ -678,7 +678,7 @@ function FeedPanel({
                         </span>
                       </div>
                       <div>
-                        <span className="uppercase block" style={{ color: "#3A3A3A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                        <span className="uppercase block" style={{ color: "#242424", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
                           CONFIRMING DIRECTION
                         </span>
                         <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>
@@ -686,7 +686,7 @@ function FeedPanel({
                         </span>
                       </div>
                       <div>
-                        <span className="uppercase block" style={{ color: "#3A3A3A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                        <span className="uppercase block" style={{ color: "#242424", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
                           WEIGHT
                         </span>
                         <span style={{ color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
@@ -694,7 +694,7 @@ function FeedPanel({
                         </span>
                       </div>
                       <div>
-                        <span className="uppercase block" style={{ color: "#3A3A3A", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
+                        <span className="uppercase block" style={{ color: "#242424", letterSpacing: "0.08em", fontSize: "11px", marginBottom: "2px" }}>
                           UPDATE FREQ
                         </span>
                         <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>
@@ -790,7 +790,7 @@ function EffectCard({ effect, thesisId, onUpdated }: { effect: Effect; thesisId:
             <div key={bet.id} className="flex items-center gap-3 mb-1">
               <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "14px" }}>{bet.ticker}</span>
               <span className="uppercase" style={{
-                color: bet.role === "BENEFICIARY" ? "var(--positive)" : bet.role === "HEADWIND" ? "var(--text-muted)" : "var(--accent)",
+                color: bet.role === "BENEFICIARY" ? "#FF4500" : "#5A5A5A",
                 fontSize: "11px", letterSpacing: "0.08em",
               }}>{bet.role}</span>
               <span style={{ color: "var(--text-muted)", fontSize: "12px", flex: 1 }}>{bet.rationale}</span>

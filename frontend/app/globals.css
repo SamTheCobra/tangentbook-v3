@@ -9,13 +9,13 @@
   --text: #F0EDE8;
   --text-muted: #5A5A5A;
   --accent: #FF4500;
-  --positive: #22C55E;
+  --positive: #FF4500;
   --border: #242424;
-  --accent-soft: #C4A882;
-  --status-live: #22C55E;
+  --accent-soft: #5A5A5A;
+  --status-live: #FF4500;
   --status-degraded: #FF4500;
   --status-stale: #5A5A5A;
-  --status-offline: #EF4444;
+  --status-offline: #5A5A5A;
 }
 
 [data-theme="light"] {
@@ -25,13 +25,13 @@
   --text: #1A1814;
   --text-muted: #6B6560;
   --accent: #E53800;
-  --positive: #16A34A;
+  --positive: #E53800;
   --border: #C8C3BB;
-  --accent-soft: #8B6914;
-  --status-live: #16A34A;
+  --accent-soft: #6B6560;
+  --status-live: #E53800;
   --status-degraded: #E53800;
   --status-stale: #6B6560;
-  --status-offline: #DC2626;
+  --status-offline: #6B6560;
 }
 
 body {

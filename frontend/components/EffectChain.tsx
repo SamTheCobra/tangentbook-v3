@@ -83,7 +83,7 @@ function ChainNode({
   isRoot?: boolean;
   isConfirmed?: boolean;
 }) {
-  const borderColor = isConfirmed ? "var(--positive)" : "var(--border)";
+  const borderColor = isConfirmed ? "#FF4500" : "var(--border)";
 
   const content = (
     <div
