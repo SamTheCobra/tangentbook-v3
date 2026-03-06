@@ -25,13 +25,14 @@ export default function StockSparkline({ ticker, role }: StockSparklineProps) {
   const min = Math.min(...points);
   const max = Math.max(...points);
   const range = max - min || 1;
-  const normalize = (v: number) => ((v - min) / range) * 28 + 2;
+  const normalize = (v: number) => ((v - min) / range) * 30 + 3;
 
-  const w = 72;
-  const h = 32;
-  const step = w / (points.length - 1);
   const pathD = points
-    .map((p, i) => `${i === 0 ? "M" : "L"}${i * step},${h - normalize(p)}`)
+    .map((p, i) => {
+      const x = (i / (points.length - 1)) * 200;
+      const y = 36 - normalize(p);
+      return `${i === 0 ? "M" : "L"}${x},${y}`;
+    })
     .join(" ");
 
   const pctChanges = points
@@ -46,16 +47,20 @@ export default function StockSparkline({ ticker, role }: StockSparklineProps) {
 
   return (
     <div
-      style={{ position: "relative", width: 72, height: 32, flexShrink: 0 }}
+      style={{ width: "100%", height: 36, overflow: "hidden", position: "relative" }}
       onMouseEnter={() => setTooltip(pctChanges)}
       onMouseLeave={() => setTooltip(null)}
     >
-      <svg width={72} height={32} style={{ overflow: "visible" }}>
+      <svg
+        viewBox="0 0 200 36"
+        preserveAspectRatio="none"
+        style={{ width: "100%", height: 36, display: "block" }}
+      >
         <path
           d={pathD}
           fill="none"
           stroke={color}
-          strokeWidth={1.5}
+          strokeWidth={1}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -64,7 +69,7 @@ export default function StockSparkline({ ticker, role }: StockSparklineProps) {
         <div
           style={{
             position: "absolute",
-            bottom: 36,
+            bottom: 40,
             right: 0,
             background: "#161616",
             border: "1px solid #242424",

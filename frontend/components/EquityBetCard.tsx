@@ -12,11 +12,11 @@ interface EquityBetCardProps {
 export default function EquityBetCard({ bet }: EquityBetCardProps) {
   return (
     <div
-      className="border p-5"
-      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+      className="border"
+      style={{ background: "var(--surface)", borderColor: "var(--border)", overflow: "hidden" }}
     >
-      {/* Row 1: Ticker + Role badges + Sparkline */}
-      <div className="flex items-center gap-3 mb-1">
+      {/* Header row: Ticker + Role badges */}
+      <div className="flex items-center gap-3 px-5 pt-5 pb-2">
         <span
           className="font-bold"
           style={{
@@ -47,76 +47,81 @@ export default function EquityBetCard({ bet }: EquityBetCardProps) {
             );
           })}
         </div>
-        <div className="ml-auto flex-shrink-0">
-          <StockSparkline ticker={bet.ticker} role={bet.role} />
+      </div>
+
+      {/* Sparkline row: full card width */}
+      <div className="px-5">
+        <StockSparkline ticker={bet.ticker} role={bet.role} />
+      </div>
+
+      {/* Body */}
+      <div className="px-5 pt-3 pb-5">
+        {/* Company name */}
+        <div
+          className="mb-2"
+          style={{
+            color: "var(--text)",
+            fontSize: "14px",
+            fontWeight: 600,
+          }}
+        >
+          {bet.companyName}
         </div>
-      </div>
 
-      {/* Row 2: Full company name */}
-      <div
-        className="mb-2"
-        style={{
-          color: "var(--text)",
-          fontSize: "14px",
-          fontWeight: 600,
-        }}
-      >
-        {bet.companyName}
-      </div>
+        {/* Company description */}
+        {bet.companyDescription && (
+          <p
+            className="mb-3"
+            style={{
+              color: "var(--text-muted)",
+              lineHeight: "1.5",
+              fontSize: "13px",
+              wordWrap: "break-word",
+              overflowWrap: "break-word",
+            }}
+          >
+            {bet.companyDescription}
+          </p>
+        )}
 
-      {/* Row 3: Company description */}
-      {bet.companyDescription && (
+        {/* Rationale */}
         <p
-          className="mb-3"
           style={{
             color: "var(--text-muted)",
             lineHeight: "1.5",
-            fontSize: "13px",
+            fontSize: "14px",
             wordWrap: "break-word",
             overflowWrap: "break-word",
           }}
         >
-          {bet.companyDescription}
+          {bet.rationale}
         </p>
-      )}
 
-      {/* Row 4: Rationale */}
-      <p
-        style={{
-          color: "var(--text-muted)",
-          lineHeight: "1.5",
-          fontSize: "14px",
-          wordWrap: "break-word",
-          overflowWrap: "break-word",
-        }}
-      >
-        {bet.rationale}
-      </p>
-
-      {/* Row 5: Feedback + Time horizon */}
-      <div className="mt-3 flex items-center gap-3">
-        {bet.isFeedbackIndicator && (
+        {/* Footer: Feedback + Time horizon */}
+        <div className="mt-3 flex items-center gap-3">
+          {bet.isFeedbackIndicator && (
+            <span
+              className="uppercase"
+              style={{
+                color: "var(--accent)",
+                letterSpacing: "0.08em",
+                fontSize: "11px",
+              }}
+            >
+              FEEDBACK INDICATOR
+            </span>
+          )}
           <span
             className="uppercase"
             style={{
-              color: "var(--accent)",
+              color: "var(--text-muted)",
               letterSpacing: "0.08em",
               fontSize: "11px",
             }}
           >
-            FEEDBACK INDICATOR
+            {bet.timeHorizon}
           </span>
-        )}
-        <span
-          className="uppercase"
-          style={{
-            color: "var(--text-muted)",
-            letterSpacing: "0.08em",
-            fontSize: "11px",
-          }}
-        >
-          {bet.timeHorizon}
-        </span>
+        </div>
       </div>
     </div>
   );
