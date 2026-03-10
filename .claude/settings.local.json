@@ -40,7 +40,9 @@
       "Bash(lsof -ti:8000 | xargs kill -9 2>/dev/null; lsof -ti:3000 | xargs kill -9 2>/dev/null; sleep 1 && echo \"killed\")",
       "Bash(cd /Users/sammorrison/tangentbook-v3/frontend && ./node_modules/.bin/tsc --noEmit 2>&1 | head -20)",
       "Bash(./node_modules/.bin/tsc --noEmit 2>&1 | head -20)",
-      "Bash(./node_modules/.bin/tsc --noEmit 2>&1)"
+      "Bash(./node_modules/.bin/tsc --noEmit 2>&1)",
+      "Bash(cd /Users/sammorrison/tangentbook-v3/frontend && ./node_modules/.bin/tsc --noEmit 2>&1)",
+      "Bash(find /Users/sammorrison/Desktop /Users/sammorrison/Downloads -name \"cascade*logo*\" -o -name \"cascade-logo*\" 2>/dev/null | head -10)"
     ]
   }
 }

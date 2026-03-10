@@ -7,6 +7,7 @@ import {
   EquityScoreResult, EFSScore, STSScore,
 } from "@/lib/api";
 import GradientBar from "@/components/GradientBar";
+import CascadeLogo from "@/components/CascadeLogo";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -245,17 +246,23 @@ export default function ThesisTreePage() {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "20px 32px", borderBottom: "1px solid #141414",
       }}>
-        <button
-          onClick={() => router.push("/")}
+        <a
+          href="/"
           style={{
-            background: "none", border: "none", cursor: "pointer",
-            fontFamily: "'Syne', sans-serif",
-            fontSize: "14px", fontWeight: 800, letterSpacing: "0.1em",
-            color: "#333",
+            display: "flex", alignItems: "center", gap: "8px",
+            textDecoration: "none", lineHeight: 0,
           }}
         >
-          &larr; CASCADE
-        </button>
+          <span style={{
+            fontFamily: "var(--font-mono), monospace",
+            fontSize: "14px", color: "#333",
+          }}>
+            &larr;
+          </span>
+          <span style={{ opacity: 0.3 }}>
+            <CascadeLogo height={28} />
+          </span>
+        </a>
         <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
           <span style={{
             fontFamily: "var(--font-mono), monospace", fontSize: "11px",

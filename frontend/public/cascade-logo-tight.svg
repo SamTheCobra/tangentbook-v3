@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 592 72" width="592" height="72">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Syne:wght@800&amp;display=swap');
+    </style>
+  </defs>
+
+  <!--
+    16px even padding on all sides.
+    Content height = 40px (mark) → canvas = 40 + 32 = 72px
+    Mark top = y16, bottom = y56, center = y36
+
+    Syne 800 44px cap-height ≈ 31.7px
+    Cap-center at y36 → baseline = 36 + 15.85 ≈ y52
+    Cap-top = 36 - 15.85 ≈ y20 (sits just inside 16px padding — optically fine)
+
+    Mark: x starts at 16
+    Gap mark-to-wordmark: 18px
+    Wordmark x: 16 + 60 + 18 = 94
+    Estimated Syne 800 44px "CASCADE" width ≈ 482px
+    Total canvas width: 16 + 60 + 18 + 482 + 16 = 592px
+  -->
+
+  <rect width="592" height="72" fill="#0D0D0D"/>
+
+  <!-- Mark -->
+  <rect x="16" y="16" width="60" height="10" fill="white"/>
+  <rect x="36" y="31" width="40" height="10" fill="white"/>
+  <rect x="56" y="46" width="20" height="10" fill="white"/>
+
+  <!-- Wordmark: baseline y52, cap-center y36 = mark center ✓ -->
+  <text
+    x="94"
+    y="52"
+    font-family="Syne, sans-serif"
+    font-size="44"
+    font-weight="800"
+    letter-spacing="1"
+    fill="white"
+  >CASCADE</text>
+</svg>

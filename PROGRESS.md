@@ -96,3 +96,34 @@
 3. `revert: equity bets back to 3-col grid, sort by EFS`
 4. `fix: equity bet card layout — consistent heights with line clamping`
 5. `feat: gradient reveal progress bars — 100-stop cubic ease-in`
+
+---
+
+## Session update — March 10 2026 (late)
+
+### Card interaction model finalized
+- Thesis tree page: all cards now toggle independently
+- Multiple cards can be open simultaneously
+- Click to open, click again to close
+- Opening one card never collapses another
+- Expanded: 3px solid #FF4500 border
+- Collapsed hover: 2px solid #FF4500
+- Collapsed default: 1px solid #222
+- State managed via Set<string> of expanded card IDs
+
+### Dashboard finalized
+- Cards always collapsed on dash — click navigates to /thesis/{id}
+- No expand behavior on dashboard at all
+- Orange hover stroke only
+
+### Previously this session
+- Full CASCADE rebrand + font system
+- Cascading tree layout with depth indentation
+- THI gauge on every card (orange gradient needle)
+- Score breakdown below gauge on expanded cards
+- EFS per-stock breakdown with formula
+- 9 stocks + 9 startups per thesis node at all depth levels
+- New thesis generation via single sentence input
+- Delete, inline title edit, generate more effects
+- Dashboard 3-col grid restored with THI gauge per card
+- Tags dropdown filter

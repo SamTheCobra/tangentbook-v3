@@ -109,7 +109,16 @@ Rules:
 - company_description should be 1-2 sentences about what they do + why relevant to thesis
 - Startup opportunities should be creative, specific, and actionable
 - Tags should be lowercase, 3-5 tags
-- Be specific and data-driven in rationales. Reference real market dynamics."""
+- Be specific and data-driven in rationales. Reference real market dynamics.
+
+CRITICAL — THI SCORE INDEPENDENCE:
+- Each 2nd and 3rd order effect MUST have its own independently reasoned thi_score between 0-100.
+- Do NOT copy the parent thesis thi_score. Do NOT make effect scores within 5 points of the parent.
+- Score each effect based on how much real-world evidence currently supports THAT SPECIFIC effect, independent of the parent.
+- 2nd order effects should typically score 60-90% of the parent thesis score (more speculative = lower).
+- 3rd order effects should typically score 40-75% of the parent thesis score (further downstream = lower).
+- Every effect's thi_score MUST differ from the parent by at least 10 points.
+- Effect scores should also differ from each other — no two effects should have the same thi_score."""
 
 
 async def call_claude(raw_thesis: str) -> dict:
@@ -321,7 +330,15 @@ Rules:
 - "timing" must be one of: TOO_EARLY, RIGHT_TIMING, CROWDING
 - Use real tickers with company_name and company_description
 - Effects must be DISTINCT from the existing ones listed
-- Be specific and data-driven in rationales"""
+- Be specific and data-driven in rationales
+
+CRITICAL — THI SCORE INDEPENDENCE:
+- Each effect MUST have its own independently reasoned thi_score between 0-100.
+- Do NOT copy the parent thesis thi_score. Do NOT make effect scores within 5 points of the parent.
+- Score each effect based on how much real-world evidence currently supports THAT SPECIFIC effect, independent of the parent.
+- Effects that are more speculative or further downstream should generally score lower than the parent thesis.
+- Every effect's thi_score MUST differ from the parent by at least 10 points.
+- Effect scores should also differ from each other — no two effects should have the same thi_score."""
 
 
 @router.post("/theses/{thesis_id}/generate-effects")

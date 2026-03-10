@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api, Thesis, MacroHeader } from "@/lib/api";
+import CascadeLogo from "@/components/CascadeLogo";
 
 type FilterTab = "ALL" | "ACTIVE" | "ARCHIVED";
 type SortMode = "order" | "thi-desc" | "conviction" | "updated";
@@ -111,12 +112,8 @@ export default function Home() {
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         zIndex: 9999,
       }}>
-        <div style={{
-          fontFamily: "'Syne', sans-serif",
-          fontSize: "14px", fontWeight: 800, letterSpacing: "0.15em",
-          color: "#333", marginBottom: "48px",
-        }}>
-          CASCADE
+        <div style={{ marginBottom: "48px", opacity: 0.25 }}>
+          <CascadeLogo height={28} />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
           <div style={{
@@ -149,13 +146,9 @@ export default function Home() {
       }}>
         {/* Left: Wordmark */}
         <div style={{ display: "flex", alignItems: "center", gap: "32px" }}>
-          <span style={{
-            fontFamily: "'Syne', sans-serif",
-            fontSize: "16px", fontWeight: 800, letterSpacing: "0.12em",
-            color: "var(--text)",
-          }}>
-            CASCADE
-          </span>
+          <a href="/" style={{ display: "block", lineHeight: 0 }}>
+            <CascadeLogo height={28} />
+          </a>
 
           {/* Macro data pills */}
           {macro && (
@@ -277,6 +270,9 @@ export default function Home() {
         </div>
       )}
 
+      {/* ─── HERO HEADER ─── */}
+      <HeroHeader onNewThesis={() => setShowInput(true)} />
+
       {/* ─── MAIN CONTENT ─── */}
       <div style={{ padding: "32px 48px", maxWidth: "1200px", margin: "0 auto" }}>
         {loading ? (
@@ -390,7 +386,8 @@ export default function Home() {
             <div style={{
               display: "grid",
               gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "0px",
+              gap: "16px",
+              alignItems: "stretch",
             }}>
               {filtered.map((thesis) => (
                 <ThesisCard
@@ -403,6 +400,56 @@ export default function Home() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Hero Header ─────────────────────────────────────────────────────────────
+
+function HeroHeader({ onNewThesis }: { onNewThesis: () => void }) {
+  const [btnHovered, setBtnHovered] = useState(false);
+  return (
+    <div style={{
+      padding: "80px 0 60px",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center",
+      width: "100%",
+      borderBottom: "1px solid #222",
+    }}>
+      <div style={{
+        display: "flex", justifyContent: "center", alignItems: "center",
+        width: "100%",
+      }}>
+        <CascadeLogo height={80} />
+      </div>
+      <div style={{
+        fontSize: "1.1rem",
+        color: "#666",
+        letterSpacing: "0.08em",
+        marginTop: "12px",
+      }}>
+        Unintended, but not unpredicted.
+      </div>
+      <button
+        onClick={onNewThesis}
+        onMouseEnter={() => setBtnHovered(true)}
+        onMouseLeave={() => setBtnHovered(false)}
+        style={{
+          marginTop: "32px",
+          padding: "14px 48px",
+          fontSize: "0.85rem",
+          letterSpacing: "0.12em",
+          border: "1px solid #FF4500",
+          color: btnHovered ? "#000" : "#FF4500",
+          background: btnHovered ? "#FF4500" : "transparent",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          textTransform: "uppercase",
+          fontWeight: 700,
+        }}
+      >
+        + New Thesis
+      </button>
     </div>
   );
 }
@@ -422,8 +469,9 @@ function ThesisCard({ thesis, onClick }: { thesis: Thesis; onClick: () => void }
         background: "#111",
         textAlign: "left",
         border: hovered ? "2px solid #FF4500" : "1px solid #222",
-        padding: hovered ? "22px" : "23px",
-        minHeight: "160px",
+        padding: "16px",
+        height: "220px",
+        overflow: "hidden",
         cursor: "pointer",
         display: "flex", flexDirection: "row", alignItems: "stretch",
       }}
@@ -440,6 +488,7 @@ function ThesisCard({ thesis, onClick }: { thesis: Thesis; onClick: () => void }
           letterSpacing: "-0.02em",
           lineHeight: "1.3",
           margin: 0,
+          textTransform: "uppercase",
         }}>
           {thesis.title}
         </h3>
