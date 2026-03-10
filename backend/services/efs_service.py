@@ -22,7 +22,12 @@ from models import (
     Thesis, Effect, THISnapshot,
 )
 
+from config import FORMULAS
+
 logger = logging.getLogger(__name__)
+
+EFS_W = FORMULAS["efs"]["weights"]
+STS_W = FORMULAS["sts"]["weights"]
 
 # Simple in-memory cache
 _cache: dict[str, tuple[float, any]] = {}
@@ -523,11 +528,11 @@ async def calculate_efs(
 
     # Weighted composite: EFS
     efs = (
-        revenue_score * 0.30 +
-        beta_score * 0.25 +
-        momentum_score * 0.20 +
-        valuation_score * 0.15 +
-        purity_score * 0.10
+        revenue_score * EFS_W["revenue_alignment"] +
+        beta_score * EFS_W["thesis_beta"] +
+        momentum_score * EFS_W["momentum_alignment"] +
+        valuation_score * EFS_W["valuation_buffer"] +
+        purity_score * EFS_W["signal_purity"]
     )
     efs = round(efs, 1)
 
@@ -613,9 +618,9 @@ async def calculate_sts(opp: StartupOpportunity, db: Session) -> StartupTimingSc
 
     # STS calculation
     sts = (
-        thi_alignment * 0.40 +
-        thi_velocity * 0.30 +
-        (100 - competition_score) * 0.30
+        thi_alignment * STS_W["thi_alignment"] +
+        thi_velocity * STS_W["thi_velocity"] +
+        (100 - competition_score) * STS_W["competition_density"]
     )
     sts = round(sts, 1)
 

@@ -12,12 +12,15 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from models import DataFeed, Thesis, Effect, MacroHeader, THISnapshot
+from config import FORMULAS
 from services.scoring_engine import (
     normalize_percentile, compute_evidence_score, compute_thi,
     compute_child_thi, score_to_direction, compute_trend, clamp,
 )
 from services.fred_client import fetch_fred_series, fetch_macro_header_data
 from services.gtrends_client import fetch_google_trends
+
+_MOM_W = FORMULAS["thi"]["components"]["momentum"]["weights"]
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +75,9 @@ async def refresh_thesis_feeds(thesis_id: str, db: Session):
     freshness = clamp((live_feeds / total_feeds) * 100) if total_feeds > 0 else 50
     signal_values = list(feed_scores.values())
     agreement = _compute_signal_agreement(signal_values) if signal_values else 50
-    conviction_data = (agreement * 0.40 + freshness * 0.35 + 70 * 0.25)  # 70 = base source quality
+    _conv_w = FORMULAS["thi"]["components"]["conviction"]["weights"]
+    _sq_base = FORMULAS["thi"]["components"]["conviction"]["source_quality_base"]
+    conviction_data = (agreement * _conv_w["signal_agreement"] + freshness * _conv_w["freshness"] + _sq_base * _conv_w["source_quality"])
     conviction_data = clamp(conviction_data)
 
     # Compute THI
@@ -169,7 +174,7 @@ def _compute_momentum_from_snapshots(thesis_id: str, current_evidence: float, db
     s90 = delta_to_score(find_nearest(now - timedelta(days=90)))
     s1y = delta_to_score(find_nearest(now - timedelta(days=365)))
 
-    return clamp(round(s30 * 0.50 + s90 * 0.30 + s1y * 0.20, 1))
+    return clamp(round(s30 * _MOM_W["30d"] + s90 * _MOM_W["90d"] + s1y * _MOM_W["1yr"], 1))
 
 
 def _compute_simple_momentum(current: float, previous: float) -> float:

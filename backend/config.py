@@ -1,8 +1,14 @@
+import json
 import os
 import sys
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Load formulas.json as single source of truth for all scoring weights
+FORMULAS_PATH = os.path.join(os.path.dirname(__file__), "../formulas.json")
+with open(FORMULAS_PATH) as f:
+    FORMULAS = json.load(f)
 
 REQUIRED = ["FRED_API_KEY", "EIA_API_KEY", "ANTHROPIC_API_KEY"]
 OPTIONAL = ["POLYGON_API_KEY", "CRUNCHBASE_API_KEY", "ALPHA_VANTAGE_API_KEY"]

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   api, ThesisDetail, Effect, EquityBet, StartupOpportunity,
-  EquityScoreResult, EFSScore, STSScore,
+  EquityScoreResult, EFSScore, STSScore, FormulasConfig,
 } from "@/lib/api";
 import GradientBar from "@/components/GradientBar";
 import CascadeLogo from "@/components/CascadeLogo";
@@ -25,7 +25,7 @@ type CardNode = {
   children: CardNode[];
 };
 
-type THIComponent = { label: string; score: number; weight: number };
+type THIComponent = { label: string; score: number; weight: number; detail?: string };
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -52,14 +52,63 @@ function getOrderLabel(depth: number) {
   return ORDER_LABELS[Math.min(depth, 3)] || `${depth + 1}TH ORDER`;
 }
 
-// EFS sub-score weights (standard EFS formula)
-const EFS_COMPONENTS = [
-  { key: "revenueAlignmentScore" as const, label: "REVENUE ALIGNMENT", weight: 0.30 },
-  { key: "thesisBetaScore" as const, label: "THESIS BETA", weight: 0.25 },
-  { key: "momentumAlignmentScore" as const, label: "MOMENTUM ALIGNMENT", weight: 0.20 },
-  { key: "valuationBufferScore" as const, label: "VALUATION BUFFER", weight: 0.15 },
-  { key: "signalPurityScore" as const, label: "SIGNAL PURITY", weight: 0.10 },
+function buildTHIComponents(
+  bd: import("@/lib/api").ScoringBreakdown,
+  weights: { evidence: number; momentum: number; conviction: number },
+  stored?: { evidenceExplanation?: string | null; momentumExplanation?: string | null; convictionExplanation?: string | null },
+): THIComponent[] {
+  // Prefer stored Claude-generated explanations; fall back to computed from feed data
+  let evidenceDetail = stored?.evidenceExplanation || undefined;
+  if (!evidenceDetail) {
+    const evidenceFeeds = [bd.evidence.flow, bd.evidence.structural, bd.evidence.adoption, bd.evidence.policy]
+      .filter((d) => d.feeds.length > 0);
+    const totalFeeds = evidenceFeeds.reduce((n, d) => n + d.feeds.length, 0);
+    const confirming = evidenceFeeds.reduce((n, d) => n + d.feeds.filter((f) => f.confirmingDirection === "confirming").length, 0);
+    evidenceDetail = totalFeeds > 0
+      ? `${confirming} of ${totalFeeds} feeds confirming across ${evidenceFeeds.length} dimensions`
+      : undefined;
+  }
+
+  let momDetail = stored?.momentumExplanation || undefined;
+  if (!momDetail) {
+    momDetail = bd.momentum.hasEnoughHistory
+      ? `30d Δ${bd.momentum.thirtyDay.delta != null ? (bd.momentum.thirtyDay.delta > 0 ? "+" : "") + bd.momentum.thirtyDay.delta.toFixed(1) : "?"} · 90d Δ${bd.momentum.ninetyDay.delta != null ? (bd.momentum.ninetyDay.delta > 0 ? "+" : "") + bd.momentum.ninetyDay.delta.toFixed(1) : "?"} · 1yr Δ${bd.momentum.oneYear.delta != null ? (bd.momentum.oneYear.delta > 0 ? "+" : "") + bd.momentum.oneYear.delta.toFixed(1) : "?"}`
+      : undefined;
+  }
+
+  let convDetail = stored?.convictionExplanation || undefined;
+  if (!convDetail) {
+    const dq = bd.dataQuality;
+    const pctConfirm = dq.agreement.pctConfirming != null ? Math.round(dq.agreement.pctConfirming * 100) : null;
+    const raw = `${dq.scoredFeeds}/${dq.totalFeeds} feeds scored` +
+      (pctConfirm != null ? ` · ${pctConfirm}% agreement` : "") +
+      (dq.sourceQuality.activeSources.length > 0 ? ` · ${dq.sourceQuality.activeSources.join(", ")}` : "");
+    convDetail = dq.totalFeeds > 0 ? raw : undefined;
+  }
+
+  return [
+    { label: "EVIDENCE", score: bd.thiFormula.evidenceScore, weight: weights.evidence, detail: evidenceDetail },
+    { label: "MOMENTUM", score: bd.thiFormula.momentumScore, weight: weights.momentum, detail: momDetail },
+    { label: "CONVICTION", score: bd.thiFormula.qualityScore, weight: weights.conviction, detail: convDetail },
+  ];
+}
+
+// EFS sub-score weights — defaults, overridden by formulas.json when loaded
+const EFS_COMPONENTS_DEFAULT = [
+  { key: "revenueAlignmentScore" as const, label: "REVENUE ALIGNMENT", weightKey: "revenue_alignment", weight: 0.30 },
+  { key: "thesisBetaScore" as const, label: "THESIS BETA", weightKey: "thesis_beta", weight: 0.25 },
+  { key: "momentumAlignmentScore" as const, label: "MOMENTUM ALIGNMENT", weightKey: "momentum_alignment", weight: 0.20 },
+  { key: "valuationBufferScore" as const, label: "VALUATION BUFFER", weightKey: "valuation_buffer", weight: 0.15 },
+  { key: "signalPurityScore" as const, label: "SIGNAL PURITY", weightKey: "signal_purity", weight: 0.10 },
 ];
+
+function getEfsComponents(f: FormulasConfig | null) {
+  if (!f) return EFS_COMPONENTS_DEFAULT;
+  return EFS_COMPONENTS_DEFAULT.map((c) => ({
+    ...c,
+    weight: f.efs.weights[c.weightKey] ?? c.weight,
+  }));
+}
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
@@ -81,6 +130,7 @@ export default function ThesisTreePage() {
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [expandedBetIds, setExpandedBetIds] = useState<Record<string, string | null>>({});
   const [breakdownMap, setBreakdownMap] = useState<Record<string, THIComponent[]>>({});
+  const [formulas, setFormulas] = useState<FormulasConfig | null>(null);
   const fetchedBreakdowns = useRef<Set<string>>(new Set());
 
   const reloadThesis = async () => {
@@ -110,20 +160,43 @@ export default function ThesisTreePage() {
   };
 
   useEffect(() => {
+    api.getFormulas().then(setFormulas).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!id) return;
     api.getThesis(id)
       .then(async (t) => {
         setThesis(t);
         setExpandedIds(new Set(["hero"]));
-        // Populate hero breakdown immediately
-        setBreakdownMap((prev) => ({
-          ...prev,
-          hero: [
-            { label: "EVIDENCE", score: t.thi.evidence.score, weight: t.thi.evidence.weight },
-            { label: "MOMENTUM", score: t.thi.momentum.score, weight: t.thi.momentum.weight },
-            { label: "CONVICTION", score: t.thi.conviction.score, weight: t.thi.conviction.weight },
-          ],
-        }));
+        // Populate hero breakdown from full scoring API
+        const storedExplanations = {
+          evidenceExplanation: t.thi.evidence.explanation,
+          momentumExplanation: t.thi.momentum.explanation,
+          convictionExplanation: t.thi.conviction.explanation,
+        };
+        api.getScoringBreakdown(id)
+          .then((bd) => {
+            setBreakdownMap((prev) => ({
+              ...prev,
+              hero: buildTHIComponents(bd, {
+                evidence: t.thi.evidence.weight,
+                momentum: t.thi.momentum.weight,
+                conviction: t.thi.conviction.weight,
+              }, storedExplanations),
+            }));
+          })
+          .catch(() => {
+            // Fallback with stored explanations only
+            setBreakdownMap((prev) => ({
+              ...prev,
+              hero: [
+                { label: "EVIDENCE", score: t.thi.evidence.score, weight: t.thi.evidence.weight, detail: storedExplanations.evidenceExplanation || undefined },
+                { label: "MOMENTUM", score: t.thi.momentum.score, weight: t.thi.momentum.weight, detail: storedExplanations.momentumExplanation || undefined },
+                { label: "CONVICTION", score: t.thi.conviction.score, weight: t.thi.conviction.weight, detail: storedExplanations.convictionExplanation || undefined },
+              ],
+            }));
+          });
         const efs = await api.getThesisEquityScores(id).catch(() => [] as EquityScoreResult[]);
         const newEfs: Record<string, EFSScore> = {};
         efs.forEach((r) => { if (r.efs) newEfs[r.betId] = r.efs; });
@@ -151,23 +224,48 @@ export default function ThesisTreePage() {
   // Fetch scoring breakdown for effect cards when they become expanded
   useEffect(() => {
     if (!thesis) return;
+    // Build a flat map of effectId -> effect thi data for stored explanations
+    const effectMap: Record<string, { evidenceExplanation?: string | null; momentumExplanation?: string | null; convictionExplanation?: string | null }> = {};
+    const collectEffects = (effects: typeof thesis.effects) => {
+      for (const e of effects) {
+        effectMap[e.id] = {
+          evidenceExplanation: e.thi.evidenceExplanation,
+          momentumExplanation: e.thi.momentumExplanation,
+          convictionExplanation: e.thi.convictionExplanation,
+        };
+        if (e.childEffects) collectEffects(e.childEffects);
+      }
+    };
+    collectEffects(thesis.effects);
+
     expandedIds.forEach((cardId) => {
       if (cardId === "hero") return;
       if (fetchedBreakdowns.current.has(cardId)) return;
       fetchedBreakdowns.current.add(cardId);
       const effectId = cardId.replace("effect-", "");
+      const stored = effectMap[effectId];
       api.getEffectScoringBreakdown(effectId)
         .then((bd) => {
           setBreakdownMap((prev) => ({
             ...prev,
-            [cardId]: [
-              { label: "EVIDENCE", score: bd.thiFormula.evidenceScore, weight: thesis.thi.evidence.weight },
-              { label: "MOMENTUM", score: bd.thiFormula.momentumScore, weight: thesis.thi.momentum.weight },
-              { label: "CONVICTION", score: bd.thiFormula.qualityScore, weight: thesis.thi.conviction.weight },
-            ],
+            [cardId]: buildTHIComponents(bd, {
+              evidence: thesis.thi.evidence.weight,
+              momentum: thesis.thi.momentum.weight,
+              conviction: thesis.thi.conviction.weight,
+            }, stored),
           }));
         })
-        .catch(() => {});
+        .catch(() => {
+          // Fallback: show stored explanations without computed feed data
+          setBreakdownMap((prev) => ({
+            ...prev,
+            [cardId]: [
+              { label: "EVIDENCE", score: 50, weight: thesis.thi.evidence.weight, detail: stored?.evidenceExplanation || undefined },
+              { label: "MOMENTUM", score: 50, weight: thesis.thi.momentum.weight, detail: stored?.momentumExplanation || undefined },
+              { label: "CONVICTION", score: 50, weight: thesis.thi.conviction.weight, detail: stored?.convictionExplanation || undefined },
+            ],
+          }));
+        });
     });
   }, [expandedIds, thesis]);
 
@@ -238,6 +336,7 @@ export default function ThesisTreePage() {
   };
 
   const flatNodes = flattenTree(tree);
+  const EFS_COMPONENTS = getEfsComponents(formulas);
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
@@ -285,7 +384,7 @@ export default function ThesisTreePage() {
       </div>
 
       {/* Tree */}
-      <div style={{ padding: "40px 32px 80px", maxWidth: "1200px", margin: "0 auto" }}>
+      <div style={{ padding: "40px 32px 80px", maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "12px" }}>
         {flatNodes.map((node) => {
           const isExpanded = expandedIds.has(node.id);
           const isHovered = hoveredCardId === node.id;
@@ -296,77 +395,81 @@ export default function ThesisTreePage() {
           const cardPlaysTab = playsTabs[node.id] || "stocks";
           const cardExpandedBet = expandedBetIds[node.id] || null;
 
-          const borderStyle = isExpanded
-            ? "3px solid #FF4500"
-            : isHovered ? "2px solid #FF4500" : "1px solid #222";
-          const basePad = isExpanded ? 25 : isHovered ? 26 : 27;
-
           return (
             <div
               key={node.id}
               style={{
                 marginLeft: `${node.depth * DEPTH_INDENT}px`,
-                marginBottom: "4px",
+                marginBottom: "0",
               }}
             >
-              {/* ── COLLAPSED ROW ── */}
-              {!isExpanded ? (
+              <div
+                onMouseEnter={() => setHoveredCardId(node.id)}
+                onMouseLeave={() => setHoveredCardId(null)}
+                style={{
+                  background: isExpanded ? "#161616" : isHovered ? "#1a1a1a" : ds.bg,
+                  border: isExpanded ? "2px solid #FF4500" : isHovered ? "2px solid #FF4500" : "1px solid #222",
+                  maxHeight: isExpanded ? "2000px" : "52px",
+                  overflow: isExpanded ? "visible" : "hidden",
+                  transition: isExpanded
+                    ? "max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease, background 0.2s ease"
+                    : "max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease, background 0.2s ease",
+                }}
+              >
+                {/* ── HEADER ROW ── */}
                 <div
                   onClick={() => toggleCard(node.id)}
-                  onMouseEnter={() => setHoveredCardId(node.id)}
-                  onMouseLeave={() => setHoveredCardId(null)}
                   style={{
-                    display: "flex", alignItems: "center", gap: "12px",
-                    background: ds.bg,
-                    border: borderStyle,
-                    padding: `0 ${basePad}px`,
+                    position: "relative",
+                    padding: "12px 20px",
                     height: "48px", cursor: "pointer",
                   }}
                 >
-                  <span style={{
-                    fontFamily: "var(--font-mono), monospace",
-                    fontSize: "10px", letterSpacing: "0.12em",
-                    color: ds.mutedColor, textTransform: "uppercase",
-                    flexShrink: 0, minWidth: "80px",
+                  {/* Collapsed content: order + title + score */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "12px",
+                    position: "absolute", inset: 0,
+                    padding: "12px 20px",
+                    opacity: isExpanded ? 0 : 1,
+                    transition: isExpanded
+                      ? "opacity 0.15s ease 0.1s"
+                      : "opacity 0.2s ease 0.15s",
                   }}>
-                    {getOrderLabel(node.depth)}
-                  </span>
-                  <span style={{
-                    fontFamily: "'Bricolage Grotesque', sans-serif",
-                    fontSize: "1rem", fontWeight: 800,
-                    color: ds.textColor, flex: 1, minWidth: 0,
-                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    <span style={{
+                      fontFamily: "var(--font-mono), monospace",
+                      fontSize: "10px", letterSpacing: "0.12em",
+                      color: ds.mutedColor, textTransform: "uppercase",
+                      flexShrink: 0, minWidth: "80px",
+                    }}>
+                      {getOrderLabel(node.depth)}
+                    </span>
+                    <span style={{
+                      fontFamily: "'Bricolage Grotesque', sans-serif",
+                      fontSize: "1rem", fontWeight: 800,
+                      color: ds.textColor, flex: 1, minWidth: 0,
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>
+                      {node.title}
+                    </span>
+                    <span style={{
+                      fontFamily: "var(--font-mono), monospace",
+                      fontSize: "13px", fontWeight: 700,
+                      color: "#FF4500", flexShrink: 0,
+                    }}>
+                      {Math.round(node.thiScore)}
+                    </span>
+                  </div>
+                  {/* Expanded content: collapse button */}
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "flex-end",
+                    position: "absolute", inset: 0,
+                    padding: "12px 20px",
+                    opacity: isExpanded ? 1 : 0,
+                    transition: isExpanded
+                      ? "opacity 0.15s ease"
+                      : "opacity 0.15s ease",
+                    pointerEvents: isExpanded ? "auto" as const : "none" as const,
                   }}>
-                    {node.title}
-                  </span>
-                  <span style={{
-                    fontFamily: "var(--font-mono), monospace",
-                    fontSize: "13px", fontWeight: 700,
-                    color: "#FF4500", flexShrink: 0,
-                  }}>
-                    {Math.round(node.thiScore)}
-                  </span>
-                </div>
-              ) : (
-                /* ── EXPANDED CARD ── */
-                <div
-                  onMouseEnter={() => setHoveredCardId(node.id)}
-                  onMouseLeave={() => setHoveredCardId(null)}
-                  style={{
-                    background: ds.bg,
-                    border: "3px solid #FF4500",
-                    padding: "25px 29px",
-                  }}
-                >
-                  {/* Collapse button row */}
-                  <div
-                    onClick={() => toggleCard(node.id)}
-                    style={{
-                      cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "flex-end",
-                      marginBottom: "8px",
-                    }}
-                  >
                     <span style={{
                       fontFamily: "var(--font-mono), monospace",
                       fontSize: "10px", color: "#444", letterSpacing: "0.04em",
@@ -374,6 +477,15 @@ export default function ThesisTreePage() {
                       ▴ Collapse
                     </span>
                   </div>
+                </div>
+
+                {/* ── EXPANDED CONTENT (revealed by max-height) ── */}
+                <div style={{
+                  padding: "0 29px 25px",
+                  opacity: isExpanded ? 1 : 0,
+                  pointerEvents: isExpanded ? "auto" as const : "none" as const,
+                  transition: "opacity 0.15s ease",
+                }}>
 
                   {/* ── TWO-COLUMN HEADER ── */}
                   <div style={{ display: "flex", gap: "24px" }}>
@@ -441,7 +553,7 @@ export default function ThesisTreePage() {
                     </div>
 
                     {/* RIGHT COLUMN ~40% — THI gauge + score breakdown */}
-                    <div style={{ flex: "0 0 40%", minWidth: 0 }}>
+                    <div style={{ flex: "0 0 40%", minWidth: 0, overflowY: "auto", maxHeight: "400px", paddingRight: "8px" }}>
                       <div style={{ display: "flex", justifyContent: "center" }}>
                         <THIGauge score={Math.round(node.thiScore)} size={160} />
                       </div>
@@ -726,7 +838,7 @@ export default function ThesisTreePage() {
                     </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
           );
         })}
@@ -926,8 +1038,8 @@ function BreakdownRow({ label, score, weight, detail }: {
 }) {
   const pctLabel = `${Math.round(weight * 100)}%`;
   return (
-    <div style={{ marginBottom: "10px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px" }}>
+    <div style={{ marginBottom: "12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
         <span style={{
           fontFamily: "var(--font-mono), monospace",
           fontSize: "9px", letterSpacing: "0.08em",
@@ -950,12 +1062,12 @@ function BreakdownRow({ label, score, weight, detail }: {
           &rarr; {Math.round(score)}
         </span>
       </div>
-      <GradientBar value={score} height={4} />
+      <GradientBar value={score} height={3} />
       {detail && (
         <div style={{
           fontFamily: "var(--font-inter), sans-serif",
-          fontSize: "10px", color: "#444",
-          fontStyle: "italic", marginTop: "3px",
+          fontSize: "0.7rem", color: "#666",
+          fontStyle: "italic", marginTop: "4px",
           lineHeight: "1.4",
         }}>
           {detail}
@@ -999,7 +1111,7 @@ function ExpandableText({ text, color }: { text: string; color: string }) {
   return (
     <div style={{ marginTop: "12px" }}>
       <p style={{
-        fontSize: "14px", lineHeight: "1.6", color,
+        fontSize: "0.95rem", lineHeight: "1.6", color: "#ccc",
         display: expanded ? "block" : "-webkit-box",
         WebkitLineClamp: expanded ? undefined : 2,
         WebkitBoxOrient: "vertical" as const,

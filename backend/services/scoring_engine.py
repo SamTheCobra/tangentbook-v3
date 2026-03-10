@@ -12,6 +12,13 @@ Child THI = (Parent THI x inheritance_weight) + (Child's own indicator score x (
 
 from datetime import datetime, timedelta
 
+from config import FORMULAS
+
+THI_WEIGHTS = FORMULAS["thi"]["weights"]
+MOM_WEIGHTS = FORMULAS["thi"]["components"]["momentum"]["weights"]
+CONV_WEIGHTS = FORMULAS["thi"]["components"]["conviction"]["weights"]
+EFS_WEIGHTS = FORMULAS["efs"]["weights"]
+
 
 def clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
     return max(low, min(high, value))
@@ -53,7 +60,7 @@ def compute_momentum_score(
     medium_term: float,
     long_term: float,
 ) -> float:
-    score = (short_term * 0.50) + (medium_term * 0.30) + (long_term * 0.20)
+    score = (short_term * MOM_WEIGHTS["30d"]) + (medium_term * MOM_WEIGHTS["90d"]) + (long_term * MOM_WEIGHTS["1yr"])
     return clamp(round(score, 1))
 
 
@@ -62,7 +69,7 @@ def compute_conviction_score(
     data_freshness: float,
     source_quality: float,
 ) -> float:
-    score = (signal_agreement * 0.40) + (data_freshness * 0.35) + (source_quality * 0.25)
+    score = (signal_agreement * CONV_WEIGHTS["signal_agreement"]) + (data_freshness * CONV_WEIGHTS["freshness"]) + (source_quality * CONV_WEIGHTS["source_quality"])
     return clamp(round(score, 1))
 
 
@@ -70,19 +77,24 @@ def compute_thi(
     evidence: float,
     momentum: float,
     conviction: float,
-    evidence_weight: float = 0.50,
-    momentum_weight: float = 0.30,
-    conviction_weight: float = 0.20,
+    evidence_weight: float = None,
+    momentum_weight: float = None,
+    conviction_weight: float = None,
 ) -> float:
-    score = (evidence * evidence_weight) + (momentum * momentum_weight) + (conviction * conviction_weight)
+    ew = evidence_weight if evidence_weight is not None else THI_WEIGHTS["evidence"]
+    mw = momentum_weight if momentum_weight is not None else THI_WEIGHTS["momentum"]
+    cw = conviction_weight if conviction_weight is not None else THI_WEIGHTS["conviction"]
+    score = (evidence * ew) + (momentum * mw) + (conviction * cw)
     return clamp(round(score, 1))
 
 
 def compute_child_thi(
     parent_thi: float,
     child_indicator_score: float,
-    inheritance_weight: float = 0.40,
+    inheritance_weight: float = None,
 ) -> float:
+    if inheritance_weight is None:
+        inheritance_weight = FORMULAS["thi"]["child_thi"]["default_inheritance_weight"]
     score = (parent_thi * inheritance_weight) + (child_indicator_score * (1 - inheritance_weight))
     return clamp(round(score, 1))
 

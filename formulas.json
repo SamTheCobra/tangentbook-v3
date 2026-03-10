@@ -1,0 +1,96 @@
+{
+  "thi": {
+    "formula": "THI = (evidence × 0.50) + (momentum × 0.30) + (conviction × 0.20)",
+    "weights": {
+      "evidence": 0.50,
+      "momentum": 0.30,
+      "conviction": 0.20
+    },
+    "components": {
+      "evidence": {
+        "description": "Weighted average of all active DataFeed normalized scores",
+        "method": "percentile_rank_5yr_history",
+        "data_sources": ["FRED", "GTRENDS"],
+        "offline_handling": "redistribute_weights_to_active_feeds",
+        "confirming_direction": "higher_is_confirming_by_default_lower_flips_score"
+      },
+      "momentum": {
+        "description": "Rate of change of evidence score over time",
+        "formula": "(30d_delta × 0.50) + (90d_delta × 0.30) + (1yr_delta × 0.20)",
+        "weights": { "30d": 0.50, "90d": 0.30, "1yr": 0.20 },
+        "method": "thi_snapshot_history_deltas",
+        "delta_mapping": "center=50, +30pts=100, -30pts=0",
+        "min_snapshots_required": 2,
+        "fallback": 50
+      },
+      "conviction": {
+        "description": "Data quality and signal reliability score",
+        "formula": "(signal_agreement × 0.40) + (freshness × 0.35) + (source_quality × 0.25)",
+        "weights": { "signal_agreement": 0.40, "freshness": 0.35, "source_quality": 0.25 },
+        "signal_agreement_method": "low_variance_among_feed_scores",
+        "freshness_method": "pct_of_feeds_currently_live",
+        "source_quality_base": 70
+      }
+    },
+    "child_thi": {
+      "formula": "child_thi = (parent_thi × inheritance_weight) + (child_own_score × (1 - inheritance_weight))",
+      "default_inheritance_weight": 0.40
+    },
+    "direction_thresholds": {
+      "confirming": 60,
+      "refuting": 40,
+      "neutral": "between 40 and 60"
+    }
+  },
+  "efs": {
+    "formula": "EFS = (revenue_alignment × 0.30) + (thesis_beta × 0.25) + (momentum_alignment × 0.20) + (valuation_buffer × 0.15) + (signal_purity × 0.10)",
+    "weights": {
+      "revenue_alignment": 0.30,
+      "thesis_beta": 0.25,
+      "momentum_alignment": 0.20,
+      "valuation_buffer": 0.15,
+      "signal_purity": 0.10
+    },
+    "components": {
+      "revenue_alignment": {
+        "description": "% of company revenue exposed to thesis from SEC 10-K",
+        "data_source": "SEC_EDGAR"
+      },
+      "thesis_beta": {
+        "description": "Correlation of stock returns vs thesis THI over 12 months",
+        "data_source": "yahoo_finance"
+      },
+      "momentum_alignment": {
+        "description": "Stock momentum direction matches THI direction over 90d",
+        "data_source": "yahoo_finance"
+      },
+      "valuation_buffer": {
+        "description": "Forward P/E vs sector median — discount = higher score",
+        "data_source": "yahoo_finance"
+      },
+      "signal_purity": {
+        "description": "Fewer business segments = purer thesis exposure",
+        "data_source": "SEC_EDGAR"
+      }
+    }
+  },
+  "sts": {
+    "formula": "STS = (thi_alignment × 0.40) + (thi_velocity × 0.35) + (competition_density_inverted × 0.25)",
+    "weights": {
+      "thi_alignment": 0.40,
+      "thi_velocity": 0.35,
+      "competition_density": 0.25
+    }
+  },
+  "macro_regime": {
+    "risk_on": { "condition": "10Y-2Y spread > 1.0" },
+    "risk_off": { "condition": "10Y-2Y spread < -0.5" },
+    "neutral": { "condition": "between -0.5 and 1.0" },
+    "data_source": "FRED",
+    "series": {
+      "ffr": "FEDFUNDS",
+      "spread": "T10Y2Y",
+      "vix": "VIXCLS"
+    }
+  }
+}

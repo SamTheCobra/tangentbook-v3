@@ -466,14 +466,16 @@ function ThesisCard({ thesis, onClick }: { thesis: Thesis; onClick: () => void }
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: "#111",
+        background: hovered ? "#1a1a1a" : "#111",
         textAlign: "left",
-        border: hovered ? "2px solid #FF4500" : "1px solid #222",
+        border: hovered ? "2px solid #FF4500" : "2px solid #333",
         padding: "16px",
         height: "220px",
         overflow: "hidden",
         cursor: "pointer",
         display: "flex", flexDirection: "row", alignItems: "stretch",
+        transform: hovered ? "translateY(-3px)" : "translateY(0)",
+        transition: "border-color 0.2s ease, background 0.2s ease, transform 0.2s ease",
       }}
     >
       {/* LEFT — title + description + metadata */}

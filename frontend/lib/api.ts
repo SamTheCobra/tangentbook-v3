@@ -125,6 +125,9 @@ export const api = {
 
   // Macro
   getMacroHeader: () => request<MacroHeader>("/macro/header"),
+
+  // Formulas
+  getFormulas: () => request<FormulasConfig>("/formulas"),
 };
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -133,9 +136,9 @@ export interface THI {
   score: number;
   direction: string;
   trend: string;
-  evidence: { score: number; weight: number };
-  momentum: { score: number; weight: number };
-  conviction: { score: number; weight: number };
+  evidence: { score: number; weight: number; explanation?: string | null };
+  momentum: { score: number; weight: number; explanation?: string | null };
+  conviction: { score: number; weight: number; explanation?: string | null };
 }
 
 export interface UserConviction {
@@ -178,7 +181,7 @@ export interface Effect {
   description: string;
   inheritanceWeight: number;
   isCollapsed: boolean;
-  thi: { score: number; direction: string; trend: string };
+  thi: { score: number; direction: string; trend: string; evidenceExplanation?: string | null; momentumExplanation?: string | null; convictionExplanation?: string | null };
   userConviction: UserConviction;
   equityBets: EquityBet[];
   startupOpportunities: StartupOpportunity[];
@@ -379,6 +382,26 @@ export interface Portfolio {
     totalPnlPct: number;
     thiScore: number | null;
   }[];
+}
+
+export interface FormulasConfig {
+  thi: {
+    formula: string;
+    weights: Record<string, number>;
+    components: Record<string, { description: string; formula?: string; weights?: Record<string, number>; [key: string]: unknown }>;
+    child_thi: { formula: string; default_inheritance_weight: number };
+    direction_thresholds: Record<string, unknown>;
+  };
+  efs: {
+    formula: string;
+    weights: Record<string, number>;
+    components: Record<string, { description: string; data_source?: string }>;
+  };
+  sts: {
+    formula: string;
+    weights: Record<string, number>;
+  };
+  macro_regime: Record<string, unknown>;
 }
 
 export interface PositionCreateInput {

@@ -18,6 +18,7 @@ from models import (
     Thesis, Effect, EquityBet, StartupOpportunity,
     EquityFitScore, StartupTimingScore, THISnapshot,
 )
+from services.feed_refresh import refresh_thesis_feeds
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["generate"])
@@ -52,6 +53,23 @@ The JSON must have this exact structure:
   "tags": ["tag1", "tag2", "tag3", "tag4"],
   "time_horizon": "1-3yr",
   "thi_score": 65.0,
+  "score_breakdown": {
+    "evidence": {
+      "score": 50,
+      "weight": 0.50,
+      "explanation": "2-3 FRED data signals confirming thesis direction"
+    },
+    "momentum": {
+      "score": 72,
+      "weight": 0.30,
+      "explanation": "Strong price momentum in related equities over 90 days"
+    },
+    "conviction": {
+      "score": 55,
+      "weight": 0.20,
+      "explanation": "Moderate analyst consensus, limited contrarian pushback"
+    }
+  },
   "equity_bets": [
     {
       "ticker": "AAPL",
@@ -77,6 +95,11 @@ The JSON must have this exact structure:
       "title": "Effect title",
       "description": "2-3 sentence description of this second-order effect",
       "thi_score": 60.0,
+      "score_breakdown": {
+        "evidence": { "score": 45, "explanation": "1 sentence on what evidence supports this effect" },
+        "momentum": { "score": 50, "explanation": "1 sentence on momentum signals" },
+        "conviction": { "score": 40, "explanation": "1 sentence on data quality/agreement" }
+      },
       "equity_bets": [],
       "startup_opportunities": []
     }
@@ -86,6 +109,11 @@ The JSON must have this exact structure:
       "title": "Effect title",
       "description": "2-3 sentence description of this third-order effect",
       "thi_score": 55.0,
+      "score_breakdown": {
+        "evidence": { "score": 35, "explanation": "1 sentence on what evidence supports this effect" },
+        "momentum": { "score": 40, "explanation": "1 sentence on momentum signals" },
+        "conviction": { "score": 30, "explanation": "1 sentence on data quality/agreement" }
+      },
       "equity_bets": [],
       "startup_opportunities": []
     }
@@ -110,6 +138,7 @@ Rules:
 - Startup opportunities should be creative, specific, and actionable
 - Tags should be lowercase, 3-5 tags
 - Be specific and data-driven in rationales. Reference real market dynamics.
+- score_breakdown MUST be included for the main thesis AND every effect. Each explanation should be 1 short sentence describing what data or signal drives that component score.
 
 CRITICAL — THI SCORE INDEPENDENCE:
 - Each 2nd and 3rd order effect MUST have its own independently reasoned thi_score between 0-100.
@@ -165,6 +194,7 @@ def save_generated_thesis(gen: dict, conviction: int, db: Session) -> str:
     order = (max_order[0] + 1) if max_order else 0
 
     thi_score = float(gen.get("thi_score", 50.0))
+    sb = gen.get("score_breakdown", {})
 
     thesis = Thesis(
         title=gen["title"],
@@ -176,6 +206,9 @@ def save_generated_thesis(gen: dict, conviction: int, db: Session) -> str:
         user_conviction_score=max(1, min(10, conviction)),
         display_order=order,
         thi_score=thi_score,
+        evidence_explanation=sb.get("evidence", {}).get("explanation"),
+        momentum_explanation=sb.get("momentum", {}).get("explanation"),
+        conviction_explanation=sb.get("conviction", {}).get("explanation"),
     )
     db.add(thesis)
     db.flush()
@@ -187,6 +220,7 @@ def save_generated_thesis(gen: dict, conviction: int, db: Session) -> str:
     _save_startups(gen.get("startup_opportunities", []), thesis.id, None, db)
 
     for so in gen.get("second_order_effects", []):
+        esb = so.get("score_breakdown", {})
         effect = Effect(
             thesis_id=thesis.id,
             parent_effect_id=None,
@@ -194,6 +228,9 @@ def save_generated_thesis(gen: dict, conviction: int, db: Session) -> str:
             title=so["title"],
             description=so.get("description", ""),
             thi_score=float(so.get("thi_score", 50.0)),
+            evidence_explanation=esb.get("evidence", {}).get("explanation"),
+            momentum_explanation=esb.get("momentum", {}).get("explanation"),
+            conviction_explanation=esb.get("conviction", {}).get("explanation"),
         )
         db.add(effect)
         db.flush()
@@ -201,6 +238,7 @@ def save_generated_thesis(gen: dict, conviction: int, db: Session) -> str:
         _save_startups(so.get("startup_opportunities", []), thesis.id, effect.id, db)
 
     for to in gen.get("third_order_effects", []):
+        esb = to.get("score_breakdown", {})
         effect = Effect(
             thesis_id=thesis.id,
             parent_effect_id=None,
@@ -208,6 +246,9 @@ def save_generated_thesis(gen: dict, conviction: int, db: Session) -> str:
             title=to["title"],
             description=to.get("description", ""),
             thi_score=float(to.get("thi_score", 50.0)),
+            evidence_explanation=esb.get("evidence", {}).get("explanation"),
+            momentum_explanation=esb.get("momentum", {}).get("explanation"),
+            conviction_explanation=esb.get("conviction", {}).get("explanation"),
         )
         db.add(effect)
         db.flush()
@@ -283,6 +324,15 @@ async def generate_thesis(data: GenerateRequest, db: Session = Depends(get_db)):
 
     gen = await call_claude(data.raw_thesis)
     thesis_id = save_generated_thesis(gen, data.conviction, db)
+
+    # Trigger real feed refresh to overwrite Claude's estimated THI with data-driven scores.
+    # NOTE: Newly generated theses have no DataFeeds configured yet, so this will
+    # return early gracefully. Once feeds are added, the scheduled refresh will pick them up.
+    try:
+        await refresh_thesis_feeds(thesis_id, db)
+    except Exception as e:
+        logger.warning(f"Feed refresh after generation failed (non-fatal): {e}")
+
     return {"id": thesis_id}
 
 
@@ -302,6 +352,11 @@ Each effect must have this structure:
   "title": "Effect title (concise, specific)",
   "description": "2-3 sentence description of this causal effect and why it follows from the thesis",
   "thi_score": <float 0-100>,
+  "score_breakdown": {
+    "evidence": { "score": <float>, "explanation": "1 sentence on what evidence supports this effect" },
+    "momentum": { "score": <float>, "explanation": "1 sentence on momentum signals" },
+    "conviction": { "score": <float>, "explanation": "1 sentence on data quality/agreement" }
+  },
   "equity_bets": [
     {
       "ticker": "AAPL",
@@ -331,6 +386,7 @@ Rules:
 - Use real tickers with company_name and company_description
 - Effects must be DISTINCT from the existing ones listed
 - Be specific and data-driven in rationales
+- score_breakdown MUST be included for every effect. Each explanation should be 1 short sentence describing what data or signal drives that component score.
 
 CRITICAL — THI SCORE INDEPENDENCE:
 - Each effect MUST have its own independently reasoned thi_score between 0-100.
@@ -401,6 +457,7 @@ Generate {data.count} new {order_label}-order causal effects for this thesis. Re
 
     created_ids = []
     for eff in effects_data:
+        esb = eff.get("score_breakdown", {})
         effect = Effect(
             thesis_id=thesis_id,
             parent_effect_id=None,
@@ -408,6 +465,9 @@ Generate {data.count} new {order_label}-order causal effects for this thesis. Re
             title=eff["title"],
             description=eff.get("description", ""),
             thi_score=float(eff.get("thi_score", 50.0)),
+            evidence_explanation=esb.get("evidence", {}).get("explanation"),
+            momentum_explanation=esb.get("momentum", {}).get("explanation"),
+            conviction_explanation=esb.get("conviction", {}).get("explanation"),
         )
         db.add(effect)
         db.flush()
@@ -416,4 +476,12 @@ Generate {data.count} new {order_label}-order causal effects for this thesis. Re
         created_ids.append(effect.id)
 
     db.commit()
+
+    # Trigger real feed refresh to recompute THI with any existing DataFeeds.
+    # NOTE: If no feeds are configured yet, this returns early gracefully.
+    try:
+        await refresh_thesis_feeds(thesis_id, db)
+    except Exception as e:
+        logger.warning(f"Feed refresh after effect generation failed (non-fatal): {e}")
+
     return {"created": len(created_ids), "ids": created_ids}

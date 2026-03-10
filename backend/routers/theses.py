@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from config import FORMULAS
 from database import get_db
 from models import (
     Thesis, Effect, EquityBet, StartupOpportunity,
@@ -12,6 +13,12 @@ from models import (
 )
 
 router = APIRouter(prefix="/api", tags=["theses"])
+
+
+@router.get("/formulas")
+async def get_formulas():
+    """Return the full formulas.json — single source of truth for all scoring weights."""
+    return FORMULAS
 
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
@@ -107,9 +114,9 @@ def thesis_to_dict(t: Thesis) -> dict:
             "score": t.thi_score,
             "direction": t.thi_direction,
             "trend": t.thi_trend,
-            "evidence": {"score": t.evidence_score, "weight": t.evidence_weight},
-            "momentum": {"score": t.momentum_score, "weight": t.momentum_weight},
-            "conviction": {"score": t.conviction_data_score, "weight": t.conviction_data_weight},
+            "evidence": {"score": t.evidence_score, "weight": t.evidence_weight, "explanation": getattr(t, "evidence_explanation", None)},
+            "momentum": {"score": t.momentum_score, "weight": t.momentum_weight, "explanation": getattr(t, "momentum_explanation", None)},
+            "conviction": {"score": t.conviction_data_score, "weight": t.conviction_data_weight, "explanation": getattr(t, "conviction_explanation", None)},
         },
         "userConviction": {
             "score": t.user_conviction_score,
@@ -137,6 +144,9 @@ def effect_to_dict(e: Effect) -> dict:
             "score": e.thi_score,
             "direction": e.thi_direction,
             "trend": e.thi_trend,
+            "evidenceExplanation": getattr(e, "evidence_explanation", None),
+            "momentumExplanation": getattr(e, "momentum_explanation", None),
+            "convictionExplanation": getattr(e, "conviction_explanation", None),
         },
         "userConviction": {
             "score": e.user_conviction_score,
