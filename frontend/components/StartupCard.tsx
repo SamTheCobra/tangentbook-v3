@@ -15,15 +15,15 @@ export default function StartupCard({ opportunity, sts }: StartupCardProps) {
 
   return (
     <div
-      className="border p-5"
-      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+      className="p-3"
+      style={{ background: "#1C1C1C", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "4px", boxShadow: "0 1px 4px rgba(0,0,0,0.5)" }}
     >
-      <div className="mb-2">
+      <div className="mb-1">
         <span className="font-bold" style={{ color: "var(--text)", fontSize: "16px" }}>
           {opportunity.name}
         </span>
       </div>
-      <p style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "14px", wordWrap: "break-word", overflowWrap: "break-word" }}>
+      <p style={{ color: "#999", lineHeight: "1.5", fontSize: "13px", wordWrap: "break-word", overflowWrap: "break-word" }}>
         {opportunity.oneLiner}
       </p>
 
@@ -34,7 +34,7 @@ export default function StartupCard({ opportunity, sts }: StartupCardProps) {
             <span
               className="uppercase"
               style={{
-                color: "var(--text-muted)",
+                color: "#999",
                 letterSpacing: "0.08em",
                 fontSize: "11px",
                 flexShrink: 0,
@@ -95,7 +95,7 @@ export default function StartupCard({ opportunity, sts }: StartupCardProps) {
         <span
           className="uppercase"
           style={{
-            color: "var(--text-muted)",
+            color: "#999",
             letterSpacing: "0.08em",
             fontSize: "11px",
           }}

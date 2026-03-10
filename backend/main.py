@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import asyncio
 import logging
 
@@ -7,7 +10,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import validate_env, FEED_REFRESH_INTERVAL_MINUTES
 from database import init_db, SessionLocal
-from routers import theses, feeds, portfolio, efs
+from routers import theses, feeds, portfolio, efs, generate
 from seed import seed_database
 from services.feed_refresh import refresh_all_theses
 
@@ -20,11 +23,12 @@ app = FastAPI(title="TangentBook v3", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["Content-Type"],
 )
 
+app.include_router(generate.router)
 app.include_router(theses.router)
 app.include_router(feeds.router)
 app.include_router(portfolio.router)

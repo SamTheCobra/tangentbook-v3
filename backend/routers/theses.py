@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api", tags=["theses"])
 class ThesisCreate(BaseModel):
     title: str
     subtitle: str
+    summary: str = ""
     description: str
     time_horizon: str
     tags: list[str] = []
@@ -27,6 +28,7 @@ class ThesisCreate(BaseModel):
 class ThesisUpdate(BaseModel):
     title: Optional[str] = None
     subtitle: Optional[str] = None
+    summary: Optional[str] = None
     description: Optional[str] = None
     time_horizon: Optional[str] = None
     tags: Optional[list[str]] = None
@@ -92,6 +94,7 @@ def thesis_to_dict(t: Thesis) -> dict:
         "id": t.id,
         "title": t.title,
         "subtitle": t.subtitle,
+        "summary": t.summary or "",
         "description": t.description,
         "timeHorizon": t.time_horizon,
         "tags": t.tags or [],
@@ -189,6 +192,7 @@ def create_thesis(data: ThesisCreate, db: Session = Depends(get_db)):
     thesis = Thesis(
         title=data.title,
         subtitle=data.subtitle,
+        summary=data.summary,
         description=data.description,
         time_horizon=data.time_horizon,
         tags=data.tags,
@@ -309,12 +313,34 @@ def update_thesis_conviction(thesis_id: str, data: ConvictionUpdate, db: Session
     thesis.user_conviction_note = data.note
     thesis.user_conviction_updated_at = datetime.utcnow()
 
+    # Recalculate THI: blend data-driven score with user conviction
+    # Data components: evidence (50%) + momentum (30%) + data quality (20%)
+    data_thi = (
+        thesis.evidence_score * thesis.evidence_weight
+        + thesis.momentum_score * thesis.momentum_weight
+        + thesis.conviction_data_score * thesis.conviction_data_weight
+    )
+    # User conviction scaled to 0-100, blended at 30% weight
+    user_scaled = thesis.user_conviction_score * 10
+    thesis.thi_score = round(data_thi * 0.7 + user_scaled * 0.3, 1)
+
     snapshot = ConvictionSnapshot(
         thesis_id=thesis_id,
         score=thesis.user_conviction_score,
         note=data.note,
     )
     db.add(snapshot)
+
+    # Also snapshot the new THI
+    thi_snap = THISnapshot(
+        thesis_id=thesis_id,
+        score=thesis.thi_score,
+        evidence_score=thesis.evidence_score,
+        momentum_score=thesis.momentum_score,
+        conviction_score=thesis.conviction_data_score,
+    )
+    db.add(thi_snap)
+
     db.commit()
     db.refresh(thesis)
     return thesis_to_dict(thesis)

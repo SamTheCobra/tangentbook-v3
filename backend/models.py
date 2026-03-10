@@ -20,6 +20,7 @@ class Thesis(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     title = Column(String, nullable=False)
     subtitle = Column(String, nullable=False)
+    summary = Column(String, default="")
     description = Column(Text, nullable=False)
     time_horizon = Column(String, nullable=False)
     tags = Column(JSON, default=list)

@@ -7,6 +7,7 @@ interface ConvictionSliderProps {
   score: number;
   history?: number[];
   onUpdate: (score: number, note?: string) => void;
+  onLiveChange?: (score: number) => void;
   divergenceWarning?: string | null;
 }
 
@@ -14,6 +15,7 @@ export default function ConvictionSlider({
   score,
   history = [],
   onUpdate,
+  onLiveChange,
   divergenceWarning,
 }: ConvictionSliderProps) {
   const [value, setValue] = useState(score);
@@ -23,6 +25,7 @@ export default function ConvictionSlider({
 
   const handleChange = (newVal: number) => {
     setValue(newVal);
+    onLiveChange?.(newVal);
   };
 
   const handleCommit = () => {

@@ -17,6 +17,16 @@ export const api = {
   getThesis: (id: string) => request<ThesisDetail>(`/theses/${id}`),
   createThesis: (data: ThesisCreateInput) =>
     request<Thesis>("/theses", { method: "POST", body: JSON.stringify(data) }),
+  generateThesis: (rawThesis: string, conviction: number) =>
+    request<{ id: string }>("/theses/generate", {
+      method: "POST",
+      body: JSON.stringify({ raw_thesis: rawThesis, conviction }),
+    }),
+  generateEffects: (thesisId: string, order: number, count: number) =>
+    request<{ created: number; ids: string[] }>(`/theses/${thesisId}/generate-effects`, {
+      method: "POST",
+      body: JSON.stringify({ order, count }),
+    }),
   updateThesis: (id: string, data: Partial<ThesisCreateInput>) =>
     request<Thesis>(`/theses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteThesis: (id: string) =>
@@ -179,6 +189,7 @@ export interface Thesis {
   id: string;
   title: string;
   subtitle: string;
+  summary: string;
   description: string;
   timeHorizon: string;
   tags: string[];

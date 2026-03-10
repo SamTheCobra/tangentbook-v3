@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { api, ThesisCreateInput } from "@/lib/api";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 
 interface NewThesisPanelProps {
   isOpen: boolean;
@@ -9,49 +10,62 @@ interface NewThesisPanelProps {
   onCreated: () => void;
 }
 
+const STATUS_MESSAGES = [
+  "Analyzing macro thesis...",
+  "Scoring equity bets...",
+  "Finding startup opportunities...",
+  "Mapping causal effects...",
+];
+
 export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesisPanelProps) {
-  const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [timeHorizon, setTimeHorizon] = useState("1-3yr");
-  const [tags, setTags] = useState("");
-  const [conviction, setConviction] = useState(5);
-  const [saving, setSaving] = useState(false);
+  const router = useRouter();
+  const [rawThesis, setRawThesis] = useState("");
+  const [conviction, setConviction] = useState(7);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [statusIdx, setStatusIdx] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (generating) {
+      setStatusIdx(0);
+      intervalRef.current = setInterval(() => {
+        setStatusIdx((prev) => (prev + 1) % STATUS_MESSAGES.length);
+      }, 3000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [generating]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = async () => {
-    if (!title || !subtitle || !description) return;
+  const handleGenerate = async () => {
+    if (!rawThesis.trim()) return;
 
-    setSaving(true);
+    setGenerating(true);
+    setError(null);
+
     try {
-      const data: ThesisCreateInput = {
-        title,
-        subtitle,
-        description,
-        time_horizon: timeHorizon,
-        tags: tags
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
-        user_conviction_score: conviction,
-      };
-      await api.createThesis(data);
+      const result = await api.generateThesis(rawThesis.trim(), conviction);
       onCreated();
       onClose();
-      // Reset
-      setTitle("");
-      setSubtitle("");
-      setDescription("");
-      setTimeHorizon("1-3yr");
-      setTags("");
-      setConviction(5);
-    } catch (e) {
-      console.error(e);
+      setRawThesis("");
+      setConviction(7);
+      router.push(`/thesis/${result.id}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Generation failed. Try again.");
     } finally {
-      setSaving(false);
+      setGenerating(false);
     }
   };
+
+  const canSubmit = rawThesis.trim().length > 0 && !generating;
 
   return (
     <>
@@ -59,7 +73,7 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
       <div
         className="fixed inset-0 z-40"
         style={{ background: "rgba(0,0,0,0.5)" }}
-        onClick={onClose}
+        onClick={generating ? undefined : onClose}
       />
       {/* Panel */}
       <div
@@ -68,8 +82,6 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
           width: "480px",
           background: "var(--surface)",
           borderColor: "var(--border)",
-          opacity: 1,
-          transition: "opacity 200ms linear",
         }}
       >
         <div className="p-8">
@@ -80,99 +92,61 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
             >
               NEW THESIS
             </h2>
-            <button
-              onClick={onClose}
-              style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "18px" }}
-            >
-              ✕
-            </button>
+            {!generating && (
+              <button
+                onClick={onClose}
+                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "18px" }}
+              >
+                ✕
+              </button>
+            )}
           </div>
 
-          <div className="space-y-5">
-            <Field label="TITLE">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border text-base"
-                style={{
-                  background: "var(--bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                  outline: "none",
-                }}
-              />
-            </Field>
-
-            <Field label="SUBTITLE">
-              <input
-                type="text"
-                value={subtitle}
-                onChange={(e) => setSubtitle(e.target.value)}
-                placeholder="The core claim in one sentence"
-                className="w-full px-3 py-2 border text-base"
-                style={{
-                  background: "var(--bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                  outline: "none",
-                }}
-              />
-            </Field>
-
-            <Field label="DESCRIPTION">
+          <div className="space-y-6">
+            {/* Thesis input */}
+            <div>
+              <label
+                className="uppercase block mb-2"
+                style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
+              >
+                YOUR THESIS
+              </label>
               <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={5}
-                className="w-full px-3 py-2 border text-base resize-none"
+                value={rawThesis}
+                onChange={(e) => setRawThesis(e.target.value)}
+                placeholder="Describe your macro thesis in one sentence..."
+                rows={4}
+                disabled={generating}
+                className="w-full px-3 py-3 border text-base resize-none"
                 style={{
                   background: "var(--bg)",
                   borderColor: "var(--border)",
                   color: "var(--text)",
                   outline: "none",
+                  fontSize: "16px",
+                  lineHeight: "1.6",
+                  opacity: generating ? 0.5 : 1,
                 }}
               />
-            </Field>
-
-            <Field label="TIME HORIZON">
-              <select
-                value={timeHorizon}
-                onChange={(e) => setTimeHorizon(e.target.value)}
-                className="w-full px-3 py-2 border text-base"
+              <div
                 style={{
-                  background: "var(--bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                  outline: "none",
+                  color: "var(--text-muted)",
+                  fontSize: "12px",
+                  marginTop: "6px",
                 }}
               >
-                <option value="0-6mo">0-6mo</option>
-                <option value="6-18mo">6-18mo</option>
-                <option value="1-3yr">1-3yr</option>
-                <option value="3-7yr">3-7yr</option>
-                <option value="7yr+">7yr+</option>
-              </select>
-            </Field>
+                e.g. &ldquo;AI Content Explosion will cause a Verification Crisis&rdquo;
+              </div>
+            </div>
 
-            <Field label="TAGS">
-              <input
-                type="text"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder="macro, AI, consumer (comma-separated)"
-                className="w-full px-3 py-2 border text-base"
-                style={{
-                  background: "var(--bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                  outline: "none",
-                  fontFamily: "JetBrains Mono, monospace",
-                }}
-              />
-            </Field>
-
-            <Field label="YOUR CONVICTION">
+            {/* Conviction slider */}
+            <div>
+              <label
+                className="uppercase block mb-2"
+                style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
+              >
+                YOUR CONVICTION
+              </label>
               <div className="flex items-center gap-3">
                 <input
                   type="range"
@@ -180,52 +154,107 @@ export default function NewThesisPanel({ isOpen, onClose, onCreated }: NewThesis
                   max={10}
                   value={conviction}
                   onChange={(e) => setConviction(parseInt(e.target.value))}
-                  style={{ accentColor: "var(--accent)", flex: 1 }}
+                  disabled={generating}
+                  style={{ accentColor: "var(--accent)", flex: 1, opacity: generating ? 0.5 : 1 }}
                 />
                 <span
                   style={{
                     color: "var(--text)",
                     fontFamily: "JetBrains Mono, monospace",
                     fontSize: "14px",
+                    minWidth: "40px",
                   }}
                 >
                   {conviction}/10
                 </span>
               </div>
-            </Field>
+            </div>
 
+            {/* Loading status */}
+            {generating && (
+              <div
+                style={{
+                  padding: "16px",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg)",
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      background: "var(--accent)",
+                      animation: "pulse 1.5s ease-in-out infinite",
+                    }}
+                  />
+                  <span
+                    className="uppercase"
+                    style={{
+                      color: "var(--text)",
+                      fontSize: "13px",
+                      letterSpacing: "0.06em",
+                      fontFamily: "JetBrains Mono, monospace",
+                    }}
+                  >
+                    {STATUS_MESSAGES[statusIdx]}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    color: "var(--text-muted)",
+                    fontSize: "11px",
+                    marginTop: "8px",
+                  }}
+                >
+                  This takes 10-15 seconds. Claude is generating equity bets, startup opportunities, and causal effects.
+                </div>
+              </div>
+            )}
+
+            {/* Error */}
+            {error && (
+              <div
+                style={{
+                  padding: "12px",
+                  border: "1px solid #FF4500",
+                  color: "#FF4500",
+                  fontSize: "13px",
+                  fontFamily: "JetBrains Mono, monospace",
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            {/* Generate button */}
             <button
-              onClick={handleSubmit}
-              disabled={saving || !title || !subtitle || !description}
-              className="w-full py-2 text-base uppercase border"
+              onClick={handleGenerate}
+              disabled={!canSubmit}
+              className="w-full py-3 text-base uppercase border"
               style={{
-                background: !title || !subtitle || !description ? "transparent" : "var(--text)",
-                color: !title || !subtitle || !description ? "var(--text-muted)" : "var(--bg)",
+                background: canSubmit ? "var(--text)" : "transparent",
+                color: canSubmit ? "var(--bg)" : "var(--text-muted)",
                 borderColor: "var(--text)",
                 letterSpacing: "0.08em",
-                cursor: !title || !subtitle || !description ? "not-allowed" : "pointer",
-                opacity: saving ? 0.5 : 1,
+                cursor: canSubmit ? "pointer" : "not-allowed",
+                opacity: generating ? 0.5 : 1,
+                fontSize: "14px",
               }}
             >
-              {saving ? "SAVING..." : "CREATE THESIS"}
+              {generating ? "GENERATING..." : "GENERATE THESIS"}
             </button>
           </div>
         </div>
+
+        {/* Pulse animation */}
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+          }
+        `}</style>
       </div>
     </>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label
-        className="uppercase block mb-1"
-        style={{ color: "var(--text-muted)", letterSpacing: "0.08em", fontSize: "13px" }}
-      >
-        {label}
-      </label>
-      {children}
-    </div>
   );
 }

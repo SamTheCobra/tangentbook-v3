@@ -28,8 +28,8 @@ export default function Skeleton({ width = "100%", lines = 1 }: SkeletonProps) {
 export function ThesisCardSkeleton() {
   return (
     <div
-      className="border p-5"
-      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+      className="p-5"
+      style={{ background: "#1C1C1C", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "4px", boxShadow: "0 1px 4px rgba(0,0,0,0.5)" }}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 mr-4">

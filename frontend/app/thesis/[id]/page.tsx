@@ -1,1391 +1,1018 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import Header from "@/components/Header";
-import Needle from "@/components/Needle";
-import EquityBetCard from "@/components/EquityBetCard";
-import StartupCard from "@/components/StartupCard";
-import ErrorBoundary from "@/components/ErrorBoundary";
-import ConvictionSlider from "@/components/ConvictionSlider";
-import TrashIcon from "@/components/TrashIcon";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import {
-  api,
-  ThesisDetail,
-  Effect,
-  ScoringBreakdown,
-  EvidenceDimension,
-  ScoringBreakdownFeed,
-  Portfolio,
-  EquityScoreResult,
-  EFSScore,
-  STSScore,
+  api, ThesisDetail, Effect, EquityBet, StartupOpportunity,
+  EquityScoreResult, EFSScore, STSScore,
 } from "@/lib/api";
+import GradientBar from "@/components/GradientBar";
 
-export default function ThesisDetailPage() {
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+type CardNode = {
+  id: string;
+  type: "hero" | "effect";
+  depth: number;
+  order: number;
+  title: string;
+  description: string;
+  thiScore: number;
+  equityBets: EquityBet[];
+  startupOpportunities: StartupOpportunity[];
+  effectId?: string;
+  children: CardNode[];
+};
+
+type THIComponent = { label: string; score: number; weight: number };
+
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+const DEPTH_INDENT = 80;
+const DEPTH_STYLES: Record<number, { bg: string; textColor: string; mutedColor: string; titleSize: string }> = {
+  0: { bg: "#141414", textColor: "#F0EDE8", mutedColor: "#666", titleSize: "2.4rem" },
+  1: { bg: "#1a1a1a", textColor: "#ccc", mutedColor: "#555", titleSize: "1.8rem" },
+  2: { bg: "#141414", textColor: "#999", mutedColor: "#444", titleSize: "1.4rem" },
+  3: { bg: "#0f0f0f", textColor: "#666", mutedColor: "#333", titleSize: "1.1rem" },
+};
+
+function getDepthStyle(depth: number) {
+  return DEPTH_STYLES[Math.min(depth, 3)];
+}
+
+const ORDER_LABELS: Record<number, string> = {
+  0: "HERO THESIS",
+  1: "2ND ORDER",
+  2: "3RD ORDER",
+  3: "4TH ORDER",
+};
+
+function getOrderLabel(depth: number) {
+  return ORDER_LABELS[Math.min(depth, 3)] || `${depth + 1}TH ORDER`;
+}
+
+// EFS sub-score weights (standard EFS formula)
+const EFS_COMPONENTS = [
+  { key: "revenueAlignmentScore" as const, label: "REVENUE ALIGNMENT", weight: 0.30 },
+  { key: "thesisBetaScore" as const, label: "THESIS BETA", weight: 0.25 },
+  { key: "momentumAlignmentScore" as const, label: "MOMENTUM ALIGNMENT", weight: 0.20 },
+  { key: "valuationBufferScore" as const, label: "VALUATION BUFFER", weight: 0.15 },
+  { key: "signalPurityScore" as const, label: "SIGNAL PURITY", weight: 0.10 },
+];
+
+// ─── Main Page ──────────────────────────────────────────────────────────────
+
+export default function ThesisTreePage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
+
   const [thesis, setThesis] = useState<ThesisDetail | null>(null);
-  const [breakdown, setBreakdown] = useState<ScoringBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [scoringOpen, setScoringOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<"bets" | "startups">("bets");
-  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
-  const [portfolioOpen, setPortfolioOpen] = useState(false);
-  const [efsScores, setEfsScores] = useState<EquityScoreResult[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [activePanels, setActivePanels] = useState<Record<string, string | null>>({});
+  const [playsTabs, setPlaysTabs] = useState<Record<string, "stocks" | "startups">>({});
+  const [efsMap, setEfsMap] = useState<Record<string, EFSScore>>({});
   const [stsMap, setStsMap] = useState<Record<string, STSScore>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+  const [expandedBetIds, setExpandedBetIds] = useState<Record<string, string | null>>({});
+  const [breakdownMap, setBreakdownMap] = useState<Record<string, THIComponent[]>>({});
+  const fetchedBreakdowns = useRef<Set<string>>(new Set());
 
   const reloadThesis = async () => {
-    const [t, b, p, efs] = await Promise.all([
+    const [t, efs] = await Promise.all([
       api.getThesis(id),
-      api.getScoringBreakdown(id),
-      api.getPortfolio(id).catch(() => null),
       api.getThesisEquityScores(id).catch(() => [] as EquityScoreResult[]),
     ]);
     setThesis(t);
-    setBreakdown(b);
-    if (p) setPortfolio(p);
-    setEfsScores(efs);
-    // Fetch STS for startups
-    if (t.startupOpportunities.length > 0) {
+    const newEfs: Record<string, EFSScore> = {};
+    efs.forEach((r) => { if (r.efs) newEfs[r.betId] = r.efs; });
+    setEfsMap(newEfs);
+    const allOpps = [
+      ...t.startupOpportunities,
+      ...t.effects.flatMap((e) => [
+        ...e.startupOpportunities,
+        ...e.childEffects.flatMap((c) => c.startupOpportunities),
+      ]),
+    ];
+    if (allOpps.length > 0) {
       const stsResults = await Promise.all(
-        t.startupOpportunities.map((opp) =>
-          api.getStartupSTS(opp.id).catch(() => null)
-        )
+        allOpps.map((o) => api.getStartupSTS(o.id).catch(() => null))
       );
-      const newStsMap: Record<string, STSScore> = {};
-      stsResults.forEach((r) => {
-        if (r?.sts) newStsMap[r.oppId] = r.sts;
-      });
-      setStsMap(newStsMap);
+      const newSts: Record<string, STSScore> = {};
+      stsResults.forEach((r) => { if (r?.sts) newSts[r.oppId] = r.sts; });
+      setStsMap(newSts);
     }
   };
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([
-      api.getThesis(id),
-      api.getScoringBreakdown(id).catch(() => null),
-      api.getPortfolio(id).catch(() => null),
-      api.getThesisEquityScores(id).catch(() => [] as EquityScoreResult[]),
-    ])
-      .then(async ([t, b, p, efs]) => {
+    api.getThesis(id)
+      .then(async (t) => {
         setThesis(t);
-        setBreakdown(b);
-        if (p) setPortfolio(p);
-        setEfsScores(efs);
-        // Fetch STS for startups
-        if (t.startupOpportunities.length > 0) {
+        setExpandedIds(new Set(["hero"]));
+        // Populate hero breakdown immediately
+        setBreakdownMap((prev) => ({
+          ...prev,
+          hero: [
+            { label: "EVIDENCE", score: t.thi.evidence.score, weight: t.thi.evidence.weight },
+            { label: "MOMENTUM", score: t.thi.momentum.score, weight: t.thi.momentum.weight },
+            { label: "CONVICTION", score: t.thi.conviction.score, weight: t.thi.conviction.weight },
+          ],
+        }));
+        const efs = await api.getThesisEquityScores(id).catch(() => [] as EquityScoreResult[]);
+        const newEfs: Record<string, EFSScore> = {};
+        efs.forEach((r) => { if (r.efs) newEfs[r.betId] = r.efs; });
+        setEfsMap(newEfs);
+        const allOpps = [
+          ...t.startupOpportunities,
+          ...t.effects.flatMap((e) => [
+            ...e.startupOpportunities,
+            ...e.childEffects.flatMap((c) => c.startupOpportunities),
+          ]),
+        ];
+        if (allOpps.length > 0) {
           const stsResults = await Promise.all(
-            t.startupOpportunities.map((opp) =>
-              api.getStartupSTS(opp.id).catch(() => null)
-            )
+            allOpps.map((o) => api.getStartupSTS(o.id).catch(() => null))
           );
-          const newStsMap: Record<string, STSScore> = {};
-          stsResults.forEach((r) => {
-            if (r?.sts) newStsMap[r.oppId] = r.sts;
-          });
-          setStsMap(newStsMap);
+          const newSts: Record<string, STSScore> = {};
+          stsResults.forEach((r) => { if (r?.sts) newSts[r.oppId] = r.sts; });
+          setStsMap(newSts);
         }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) {
+  // Fetch scoring breakdown for effect cards when they become expanded
+  useEffect(() => {
+    if (!thesis) return;
+    expandedIds.forEach((cardId) => {
+      if (cardId === "hero") return;
+      if (fetchedBreakdowns.current.has(cardId)) return;
+      fetchedBreakdowns.current.add(cardId);
+      const effectId = cardId.replace("effect-", "");
+      api.getEffectScoringBreakdown(effectId)
+        .then((bd) => {
+          setBreakdownMap((prev) => ({
+            ...prev,
+            [cardId]: [
+              { label: "EVIDENCE", score: bd.thiFormula.evidenceScore, weight: thesis.thi.evidence.weight },
+              { label: "MOMENTUM", score: bd.thiFormula.momentumScore, weight: thesis.thi.momentum.weight },
+              { label: "CONVICTION", score: bd.thiFormula.qualityScore, weight: thesis.thi.conviction.weight },
+            ],
+          }));
+        })
+        .catch(() => {});
+    });
+  }, [expandedIds, thesis]);
+
+  if (loading || !thesis) {
     return (
-      <main className="min-h-screen" style={{ background: "var(--bg)" }}>
-        <Header />
-        <div
-          className="px-12 py-8"
-          style={{
-            color: "var(--text-muted)",
-            fontFamily: "JetBrains Mono, monospace",
-          }}
-        >
-          ————————
-        </div>
-      </main>
+      <div style={{
+        minHeight: "100vh", background: "var(--bg)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <span style={{
+          fontFamily: "var(--font-mono), monospace", fontSize: "13px", color: "#333",
+        }}>
+          {loading ? "————————" : "Thesis not found."}
+        </span>
+      </div>
     );
   }
 
-  if (!thesis) {
-    return (
-      <main className="min-h-screen" style={{ background: "var(--bg)" }}>
-        <Header />
-        <div
-          className="px-12 py-8"
-          style={{ color: "var(--text-muted)", fontSize: "15px" }}
-        >
-          Thesis not found.
-        </div>
-      </main>
-    );
-  }
+  const tree = buildTree(thesis);
 
-  const handleConviction = async (score: number, note?: string) => {
-    await api.updateConviction(id, score, note);
+  const toggleCard = (cardId: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardId)) {
+        next.delete(cardId);
+      } else {
+        next.add(cardId);
+      }
+      return next;
+    });
+  };
+
+  const handleSaveTitle = async (node: CardNode) => {
+    if (!editDraft.trim()) { setEditingId(null); return; }
+    if (node.type === "hero") {
+      await api.updateThesis(id, { title: editDraft.trim() });
+    } else if (node.effectId) {
+      await api.updateEffect(node.effectId, { title: editDraft.trim() });
+    }
+    setEditingId(null);
     await reloadThesis();
   };
 
-  const handleRefreshFeeds = async () => {
-    setRefreshing(true);
+  const handleDelete = async () => {
+    if (!confirm(`Delete "${thesis.title}"? This cannot be undone.`)) return;
+    await api.deleteThesis(id);
+    router.push("/");
+  };
+
+  const handleGenerateEffects = async (order: number) => {
+    setGeneratingFor(`gen-${order}`);
     try {
-      await api.refreshFeeds(id);
+      await api.generateEffects(id, order, 3);
       await reloadThesis();
     } catch (e) {
-      console.error("Feed refresh failed:", e);
+      console.error(e);
     } finally {
-      setRefreshing(false);
+      setGeneratingFor(null);
     }
   };
 
-  const eScore = Math.round(thesis.thi.evidence.score);
-  const mScore = Math.round(thesis.thi.momentum.score);
-  const cScore = Math.round(thesis.thi.conviction.score);
-  const eContrib = (eScore * 0.50).toFixed(1);
-  const mContrib = (mScore * 0.30).toFixed(1);
-  const cContrib = (cScore * 0.20).toFixed(1);
-  const thiTotal = (eScore * 0.50 + mScore * 0.30 + cScore * 0.20).toFixed(1);
+  const togglePill = (cardId: string, panel: string) => {
+    setActivePanels((prev) => ({
+      ...prev,
+      [cardId]: prev[cardId] === panel ? null : panel,
+    }));
+    setExpandedBetIds((prev) => ({ ...prev, [cardId]: null }));
+  };
+
+  const flatNodes = flattenTree(tree);
 
   return (
-    <ErrorBoundary>
-      <main className="min-h-screen" style={{ background: "var(--bg)" }}>
-        <Header />
-        <div className="px-12 py-8">
-          {/* ── BREADCRUMB ── */}
-          <div className="flex items-center gap-2 mb-6">
-            <Link
-              href="/"
-              className="uppercase hover:underline"
-              style={{
-                color: "var(--text-muted)",
-                letterSpacing: "0.08em",
-                textUnderlineOffset: "3px",
-                fontSize: "13px",
-              }}
-            >
-              TANGENTBOOK
-            </Link>
-            <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>
-              /
-            </span>
-            <span
-              className="uppercase"
-              style={{
-                color: "var(--text)",
-                letterSpacing: "0.08em",
-                fontSize: "13px",
-              }}
-            >
-              {thesis.title}
-            </span>
-          </div>
-
-          {/* ══════════════════════════════════════════════════
-              SECTION 1: HERO
-              ══════════════════════════════════════════════════ */}
-          <div className="flex gap-12 mb-6">
-            <div className="flex-1">
-              <h1
-                className="font-bold uppercase text-3xl mb-2"
-                style={{
-                  color: "var(--text)",
-                  letterSpacing: "-0.04em",
-                  wordWrap: "break-word",
-                  overflowWrap: "break-word",
-                }}
-              >
-                {thesis.title}
-              </h1>
-              <p
-                className="mb-4"
-                style={{
-                  color: "var(--text-muted)",
-                  lineHeight: "1.6",
-                  fontSize: "16px",
-                }}
-              >
-                {thesis.description}
-              </p>
-              <div className="flex items-center gap-6 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="uppercase"
-                    style={{
-                      color: "var(--text-muted)",
-                      letterSpacing: "0.08em",
-                      fontSize: "13px",
-                    }}
-                  >
-                    HORIZON
-                  </span>
-                  <span
-                    style={{
-                      color: "var(--text)",
-                      fontFamily: "JetBrains Mono, monospace",
-                      fontSize: "15px",
-                    }}
-                  >
-                    {thesis.timeHorizon}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className="uppercase"
-                    style={{
-                      color: "var(--text-muted)",
-                      letterSpacing: "0.08em",
-                      fontSize: "13px",
-                    }}
-                  >
-                    DIRECTION
-                  </span>
-                  <span
-                    style={{
-                      color: "var(--text)",
-                      fontFamily: "JetBrains Mono, monospace",
-                      fontSize: "15px",
-                    }}
-                  >
-                    {thesis.thi.direction.toUpperCase()}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-4">
-                <ConvictionSlider
-                  score={thesis.userConviction.score}
-                  history={
-                    thesis.userConviction.history?.map((h) => h.score) || []
-                  }
-                  onUpdate={handleConviction}
-                  divergenceWarning={thesis.userConviction.divergenceWarning}
-                />
-              </div>
-            </div>
-            <div className="flex-shrink-0">
-              <Needle
-                score={thesis.thi.score}
-                size="lg"
-                label="THESIS HEALTH INDEX"
-              />
-              <div style={{ fontFamily: "JetBrains Mono, monospace", marginTop: "8px", lineHeight: "1.6" }}>
-                <div style={{ fontSize: "12px", color: "#5A5A5A" }}>
-                  THI = (Evidence × 0.50) + (Momentum × 0.30) + (Quality × 0.20)
-                </div>
-                <div style={{ fontSize: "12px", color: "#5A5A5A" }}>
-                  THI = ({eScore} × 0.50) + ({mScore} × 0.30) + ({cScore} × 0.20)
-                </div>
-                <div style={{ fontSize: "12px", color: "#5A5A5A" }}>
-                  THI = {eContrib} + {mContrib} + {cContrib}
-                </div>
-                <div style={{ fontSize: "14px", color: "#FF4500", fontWeight: "bold" }}>
-                  THI = {thiTotal} → rounded to {Math.round(Number(thiTotal))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Collapsible scoring breakdown trigger */}
-          <div className="flex items-center justify-between mb-6">
-            <button
-              onClick={() => setScoringOpen(!scoringOpen)}
-              className="uppercase flex items-center gap-2"
-              style={{
-                color: "var(--text-muted)",
-                letterSpacing: "0.08em",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "13px",
-              }}
-            >
-              HOW IS THIS SCORED?{" "}
-              <span style={{ fontSize: "12px" }}>
-                {scoringOpen ? "▲" : "▾"}
-              </span>
-            </button>
-            <button
-              onClick={handleRefreshFeeds}
-              disabled={refreshing}
-              className="uppercase px-3 py-1 border"
-              style={{
-                color: refreshing ? "var(--text-muted)" : "var(--accent)",
-                borderColor: refreshing ? "var(--border)" : "var(--accent)",
-                letterSpacing: "0.08em",
-                background: "none",
-                cursor: refreshing ? "not-allowed" : "pointer",
-                fontSize: "11px",
-                opacity: refreshing ? 0.5 : 1,
-              }}
-            >
-              {refreshing ? "REFRESHING..." : "REFRESH FEEDS ↺"}
-            </button>
-          </div>
-
-          {/* ══════════════════════════════════════════════════
-              SECTION 2: SCORING BREAKDOWN (collapsible)
-              ══════════════════════════════════════════════════ */}
-          {scoringOpen && !breakdown && (
-            <div className="mb-4 p-3 border" style={{ borderColor: "var(--text-muted)", color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }}>
-              Loading scoring data...
-            </div>
-          )}
-          {scoringOpen && breakdown && (
-            <div className="mb-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-4">
-                <ErrorBoundary><EvidenceColumn breakdown={breakdown} /></ErrorBoundary>
-                <ErrorBoundary><MomentumColumn breakdown={breakdown} /></ErrorBoundary>
-                <ErrorBoundary><DataQualityColumn breakdown={breakdown} /></ErrorBoundary>
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════
-              SECTION 2.5: PORTFOLIO TRACKER
-              ══════════════════════════════════════════════════ */}
-          <PortfolioTracker
-            thesisId={thesis.id}
-            portfolio={portfolio}
-            isOpen={portfolioOpen}
-            onToggle={() => setPortfolioOpen(!portfolioOpen)}
-            onReload={reloadThesis}
-          />
-
-          <div
-            className="mb-8"
-            style={{ borderTop: "1px solid var(--border)" }}
-          />
-
-          {/* ══════════════════════════════════════════════════
-              SECTION 3: BETS + OPPORTUNITIES (tabbed)
-              ══════════════════════════════════════════════════ */}
-          {(thesis.equityBets.length > 0 ||
-            thesis.startupOpportunities.length > 0) && (
-            <>
-              <div className="flex items-center gap-6 mb-4">
-                <TabButton
-                  label={`EQUITY BETS (${thesis.equityBets.length})`}
-                  active={activeTab === "bets"}
-                  onClick={() => setActiveTab("bets")}
-                />
-                <TabButton
-                  label={`STARTUP OPPORTUNITIES (${thesis.startupOpportunities.length})`}
-                  active={activeTab === "startups"}
-                  onClick={() => setActiveTab("startups")}
-                />
-              </div>
-              {activeTab === "bets" && (() => {
-                const efsMap: Record<string, EFSScore> = {};
-                efsScores.forEach((r) => {
-                  if (r.efs) efsMap[r.betId] = r.efs;
-                });
-                const ROLE_ORDER: Record<string, number> = { BENEFICIARY: 0, HEADWIND: 1, CANARY: 2 };
-                const sortedBets = [...thesis.equityBets].sort((a, b) => {
-                  const roleA = ROLE_ORDER[a.role] ?? 9;
-                  const roleB = ROLE_ORDER[b.role] ?? 9;
-                  if (roleA !== roleB) return roleA - roleB;
-                  return (efsMap[b.id]?.efsScore ?? -1) - (efsMap[a.id]?.efsScore ?? -1);
-                });
-                const rankMap: Record<string, number> = {};
-                sortedBets.forEach((bet, i) => {
-                  if (efsMap[bet.id]) rankMap[bet.id] = i + 1;
-                });
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
-                    {sortedBets.map((bet) => (
-                      <EquityBetCard
-                        key={bet.id}
-                        bet={bet}
-                        efs={efsMap[bet.id] ?? null}
-                        rank={rankMap[bet.id]}
-                      />
-                    ))}
-                  </div>
-                );
-              })()}
-              {activeTab === "startups" && (() => {
-                const sortedOpps = [...thesis.startupOpportunities].sort((a, b) => {
-                  const stsA = stsMap[a.id]?.stsScore ?? -1;
-                  const stsB = stsMap[b.id]?.stsScore ?? -1;
-                  return stsB - stsA;
-                });
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
-                    {sortedOpps.map((opp) => (
-                      <StartupCard
-                        key={opp.id}
-                        opportunity={opp}
-                        sts={stsMap[opp.id] ?? null}
-                      />
-                    ))}
-                  </div>
-                );
-              })()}
-            </>
-          )}
-
-          {/* ══════════════════════════════════════════════════
-              SECTION 5: EFFECT THUMBNAILS
-              ══════════════════════════════════════════════════ */}
-          {thesis.effects.length > 0 && (
-            <>
-              <div className="flex items-center justify-between mb-4">
-                <h3
-                  className="uppercase"
-                  style={{
-                    color: "var(--text-muted)",
-                    letterSpacing: "0.08em",
-                    fontSize: "13px",
-                  }}
-                >
-                  2ND ORDER EFFECTS ({thesis.effects.length})
-                </h3>
-                <AddEffectButton thesisId={thesis.id} onCreated={reloadThesis} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
-                {thesis.effects.map((effect) => (
-                  <EffectThumbnail
-                    key={effect.id}
-                    effect={effect}
-                    thesisId={thesis.id}
-                    onDeleted={reloadThesis}
-                  />
-                ))}
-              </div>
-              <div className="mb-8" />
-            </>
-          )}
-        </div>
-      </main>
-    </ErrorBoundary>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   SCORING BREAKDOWN COLUMNS
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function EvidenceColumn({ breakdown }: { breakdown: ScoringBreakdown }) {
-  const ev = breakdown.evidence;
-  const dims = [
-    { key: "flow", label: "Flow signals", data: ev.flow },
-    { key: "structural", label: "Structural signals", data: ev.structural },
-    { key: "adoption", label: "Adoption signals", data: ev.adoption },
-    { key: "policy", label: "Policy signals", data: ev.policy },
-  ];
-
-  return (
-    <div
-      className="border p-5"
-      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-    >
-      <div className="mb-3">
-        <div className="flex items-center justify-between">
-          <span className="uppercase font-bold" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}>
-            EVIDENCE SCORE: {Math.round(ev.score)} / 100
-          </span>
-        </div>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-          Weight in final THI: 50%
-        </div>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--accent)", marginTop: "2px" }}>
-          Contribution to THI: {Math.round(ev.score)} × 0.50 = {ev.contribution} points
-        </div>
-      </div>
-      <div className="flex justify-center mb-4">
-        <Needle score={ev.score} size="sm" label="" animated={true} />
-      </div>
-      <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", fontStyle: "italic" }}>
-        How it&apos;s calculated:
-      </div>
-      {dims.map(({ key, label, data }) => {
-        const dimScore = data.score != null ? Math.round(data.score) : 0;
-        const contrib = ev.dimContributions?.[key] ?? 0;
-        return (
-          <div key={key} className="mb-1" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px" }}>
-            <span style={{ color: "var(--text-muted)" }}>
-              {label} ({(data.weight * 100).toFixed(0)}% of Evidence) →{" "}
-            </span>
-            <span style={{ color: dimScore > 0 ? "var(--accent)" : "var(--text-muted)" }}>
-              score {dimScore}
-            </span>
-            <span style={{ color: "var(--text-muted)" }}>
-              {" "}→ contributes {contrib.toFixed(1)} pts
-            </span>
-          </div>
-        );
-      })}
-      <div style={{ borderTop: "1px solid var(--border)", margin: "8px 0" }} />
-      <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)" }}>
-        Evidence = {ev.formula} = {Math.round(ev.score)}
-      </div>
-      <div style={{ borderTop: "1px solid var(--border)", margin: "12px 0" }} />
-      <div className="flex flex-col gap-4">
-        {dims.map(({ key, label, data }) => (
-          <DimensionBlock key={key} label={label} dim={data} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DimensionBlock({
-  label,
-  dim,
-}: {
-  label: string;
-  dim: EvidenceDimension;
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="uppercase" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "11px" }}>
-          {label}
-        </span>
-        <span
+    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+      {/* Top bar */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "20px 32px", borderBottom: "1px solid #141414",
+      }}>
+        <button
+          onClick={() => router.push("/")}
           style={{
-            color: dim.score != null ? "var(--accent)" : "var(--text-muted)",
-            fontFamily: "JetBrains Mono, monospace",
-            fontSize: "13px",
+            background: "none", border: "none", cursor: "pointer",
+            fontFamily: "'Syne', sans-serif",
+            fontSize: "14px", fontWeight: 800, letterSpacing: "0.1em",
+            color: "#333",
           }}
         >
-          {dim.score != null ? `${Math.round(dim.score)} / 100` : "—"}
-        </span>
-      </div>
-      <p style={{ color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4", marginBottom: "6px" }}>
-        {dim.description}
-      </p>
-      {dim.feeds.length > 0 ? (
-        <div style={{ fontSize: "11px" }}>
-          {dim.feeds.map((f) => (
-            <FeedRow key={f.name} feed={f} />
-          ))}
-        </div>
-      ) : (
-        <span style={{ color: "var(--text-muted)", fontSize: "11px", fontStyle: "italic" }}>
-          No {label.toLowerCase()} feeds configured
-        </span>
-      )}
-    </div>
-  );
-}
-
-function FeedRow({ feed: f }: { feed: ScoringBreakdownFeed }) {
-  const statusLabel = f.status === "live" ? "LIVE" : f.status === "stale" ? "STALE" : f.status === "degraded" ? "DEGRADED" : "OFFLINE";
-  const statusColor = f.status === "live" ? "var(--status-live)" : f.status === "stale" ? "#F59E0B" : "#EF4444";
-  const sourceLabel = f.source === "FRED" ? `FRED: ${f.seriesId}` : f.source === "GTRENDS" ? `GTrends: "${f.keyword}"` : f.source || "";
-
-  // Live feed with data
-  if (f.status === "live" && f.normalizedScore != null) {
-    return (
-      <div className="mb-3 pb-3" style={{ borderBottom: "1px solid var(--border)" }}>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text)", fontWeight: "bold" }}>
-          {f.name} ({sourceLabel})
-        </div>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", marginTop: "3px" }}>
-          <span style={{ color: "var(--text)" }}>Current: {f.formattedValue || "—"}</span>
-          <span style={{ color: "var(--text-muted)" }}>{" "}|{" "}</span>
-          <span style={{ color: "var(--accent)" }}>Score: {f.normalizedScore} / 100</span>
-        </div>
-        {(f.pctVs1yr != null || f.pctVs5yrAvg != null) && (
-          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "10px", marginTop: "2px", color: "var(--text-muted)" }}>
-            {f.pctVs1yr != null && (
-              <span>
-                1yr ago → <span style={{ color: f.pctVs1yr >= 0 ? "#FF4500" : "var(--text-muted)" }}>
-                  {f.pctVs1yr >= 0 ? "UP" : "DOWN"} {Math.abs(f.pctVs1yr)}%
-                </span>
-                {f.confirmingDirection && (
-                  <span> — {f.pctVs1yr >= 0 === (f.confirmingDirection === "higher") ? "CONFIRMING" : "REFUTING"}{" "}
-                    ({f.confirmingDirection} = confirming)
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
-        )}
-        {f.lastUpdated && (
-          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "10px", marginTop: "2px", color: "var(--text-muted)" }}>
-            Last updated: {new Date(f.lastUpdated).toLocaleString()}{" "}|{" "}Status: <span style={{ color: statusColor }}>{statusLabel}</span>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Degraded feed
-  if (f.status === "degraded" || f.status === "stale") {
-    return (
-      <div className="mb-3 pb-3" style={{ borderBottom: "1px solid var(--border)" }}>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text-muted)" }}>
-          {f.name} ({sourceLabel})
-        </div>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", marginTop: "3px", color: statusColor }}>
-          {f.formattedValue ? (
-            <>Last known: {f.formattedValue} — DATA {statusLabel}</>
-          ) : (
-            <>No data fetched yet. Click REFRESH FEEDS to pull latest.</>
-          )}
-        </div>
-        {f.normalizedScore != null && (
-          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "10px", marginTop: "2px", color: "var(--text-muted)" }}>
-            Score held at last known value: {f.normalizedScore}. Marked {statusLabel}.
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // No data yet
-  return (
-    <div className="mb-3 pb-3" style={{ borderBottom: "1px solid var(--border)" }}>
-      <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text-muted)" }}>
-        {f.name} ({sourceLabel})
-      </div>
-      <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", marginTop: "3px", color: "var(--text-muted)" }}>
-        No data fetched yet. Click REFRESH FEEDS to pull latest.
-      </div>
-    </div>
-  );
-}
-
-function MomentumColumn({ breakdown }: { breakdown: ScoringBreakdown }) {
-  const m = breakdown.momentum;
-  const entries = [
-    { label: "30-day change", weight: "50%", weightNum: 0.50, data: m.thirtyDay },
-    { label: "90-day change", weight: "35%", weightNum: 0.35, data: m.ninetyDay },
-    { label: "1-year change", weight: "15%", weightNum: 0.15, data: m.oneYear },
-  ];
-
-  const mFormula = `(${Math.round(m.thirtyDay.score)}×0.50) + (${Math.round(m.ninetyDay.score)}×0.35) + (${Math.round(m.oneYear.score)}×0.15)`;
-
-  return (
-    <div
-      className="border p-5"
-      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-    >
-      <div className="mb-3">
-        <div className="flex items-center justify-between">
-          <span className="uppercase font-bold" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}>
-            MOMENTUM SCORE: {Math.round(m.score)} / 100
+          &larr; CASCADE
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          <span style={{
+            fontFamily: "var(--font-mono), monospace", fontSize: "11px",
+            color: "#333", letterSpacing: "0.04em",
+            maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {thesis.title}
           </span>
+          <button
+            onClick={handleDelete}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: "var(--font-mono), monospace", fontSize: "11px",
+              color: "#333", letterSpacing: "0.06em", textTransform: "uppercase",
+            }}
+          >
+            Delete
+          </button>
         </div>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-          Weight in final THI: 30%
-        </div>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--accent)", marginTop: "2px" }}>
-          Contribution to THI: {Math.round(m.score)} × 0.30 = {m.contribution} points
-        </div>
-      </div>
-      <div className="flex justify-center mb-4">
-        <Needle score={m.score} size="sm" label="" animated={true} />
       </div>
 
-      {!m.hasEnoughHistory ? (
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.6" }}>
-          Not enough historical snapshots yet to compute momentum.
-          Score defaults to 50 (neutral) until 30 days of data exists.
-          {m.firstSnapshotDate && (
-            <> First snapshot: {new Date(m.firstSnapshotDate).toLocaleDateString()}.</>
-          )}
-        </div>
-      ) : (
-        <>
-          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", fontStyle: "italic" }}>
-            How it&apos;s calculated:
-          </div>
-          <div className="flex flex-col gap-4">
-            {entries.map((e) => (
-              <div key={e.label}>
-                <div className="flex items-center justify-between mb-1">
-                  <span style={{ color: "var(--text)", fontSize: "11px" }}>
-                    {e.label} ({e.weight} of Momentum)
+      {/* Tree */}
+      <div style={{ padding: "40px 32px 80px", maxWidth: "1200px", margin: "0 auto" }}>
+        {flatNodes.map((node) => {
+          const isExpanded = expandedIds.has(node.id);
+          const isHovered = hoveredCardId === node.id;
+          const ds = getDepthStyle(node.depth);
+          const totalPlays = node.equityBets.length + node.startupOpportunities.length;
+          const nodeBreakdown = breakdownMap[node.id];
+          const cardPanel = activePanels[node.id] || null;
+          const cardPlaysTab = playsTabs[node.id] || "stocks";
+          const cardExpandedBet = expandedBetIds[node.id] || null;
+
+          const borderStyle = isExpanded
+            ? "3px solid #FF4500"
+            : isHovered ? "2px solid #FF4500" : "1px solid #222";
+          const basePad = isExpanded ? 25 : isHovered ? 26 : 27;
+
+          return (
+            <div
+              key={node.id}
+              style={{
+                marginLeft: `${node.depth * DEPTH_INDENT}px`,
+                marginBottom: "4px",
+              }}
+            >
+              {/* ── COLLAPSED ROW ── */}
+              {!isExpanded ? (
+                <div
+                  onClick={() => toggleCard(node.id)}
+                  onMouseEnter={() => setHoveredCardId(node.id)}
+                  onMouseLeave={() => setHoveredCardId(null)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "12px",
+                    background: ds.bg,
+                    border: borderStyle,
+                    padding: `0 ${basePad}px`,
+                    height: "48px", cursor: "pointer",
+                  }}
+                >
+                  <span style={{
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: "10px", letterSpacing: "0.12em",
+                    color: ds.mutedColor, textTransform: "uppercase",
+                    flexShrink: 0, minWidth: "80px",
+                  }}>
+                    {getOrderLabel(node.depth)}
                   </span>
-                  <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
-                    {Math.round(e.data.score)}
+                  <span style={{
+                    fontFamily: "'Bricolage Grotesque', sans-serif",
+                    fontSize: "1rem", fontWeight: 800,
+                    color: ds.textColor, flex: 1, minWidth: 0,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>
+                    {node.title}
+                  </span>
+                  <span style={{
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: "13px", fontWeight: 700,
+                    color: "#FF4500", flexShrink: 0,
+                  }}>
+                    {Math.round(node.thiScore)}
                   </span>
                 </div>
-                <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.5" }}>
-                  {e.data.delta != null && e.data.prevEvidence != null ? (
-                    <>
-                      Evidence was {e.data.prevEvidence} on{" "}
-                      {e.data.prevDate ? new Date(e.data.prevDate).toLocaleDateString() : "?"} → {m.currentEvidence} today
-                      <br />
-                      <span style={{ color: e.data.delta >= 0 ? "#FF4500" : "var(--text-muted)" }}>
-                        Delta: {e.data.delta >= 0 ? "+" : ""}{e.data.delta} pts → score {Math.round(e.data.score)}
-                        {e.data.delta === 0 ? " (neutral)" : e.data.delta > 0 ? " (strengthening)" : " (weakening)"}
-                      </span>
-                    </>
-                  ) : (
-                    <span>— insufficient history for this window</span>
+              ) : (
+                /* ── EXPANDED CARD ── */
+                <div
+                  onMouseEnter={() => setHoveredCardId(node.id)}
+                  onMouseLeave={() => setHoveredCardId(null)}
+                  style={{
+                    background: ds.bg,
+                    border: "3px solid #FF4500",
+                    padding: "25px 29px",
+                  }}
+                >
+                  {/* Collapse button row */}
+                  <div
+                    onClick={() => toggleCard(node.id)}
+                    style={{
+                      cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "flex-end",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <span style={{
+                      fontFamily: "var(--font-mono), monospace",
+                      fontSize: "10px", color: "#444", letterSpacing: "0.04em",
+                    }}>
+                      ▴ Collapse
+                    </span>
+                  </div>
+
+                  {/* ── TWO-COLUMN HEADER ── */}
+                  <div style={{ display: "flex", gap: "24px" }}>
+                    {/* LEFT COLUMN ~60% — order, title, description */}
+                    <div style={{ flex: "0 0 58%", minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: "var(--font-mono), monospace",
+                        fontSize: "10px", letterSpacing: "0.12em",
+                        color: ds.mutedColor, marginBottom: "8px",
+                        textTransform: "uppercase",
+                      }}>
+                        {getOrderLabel(node.depth)}
+                      </div>
+
+                      {editingId === node.id ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <input
+                            autoFocus
+                            value={editDraft}
+                            onChange={(e) => setEditDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSaveTitle(node);
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            style={{
+                              flex: 1, background: "transparent",
+                              border: "none", borderBottom: "1px solid var(--accent)",
+                              outline: "none", color: ds.textColor,
+                              fontFamily: "'Bricolage Grotesque', sans-serif",
+                              fontSize: ds.titleSize, fontWeight: 800,
+                              padding: "0 0 2px",
+                            }}
+                          />
+                          <button onClick={() => handleSaveTitle(node)} style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            fontFamily: "var(--font-mono), monospace", fontSize: "11px",
+                            color: "var(--accent)",
+                          }}>Save</button>
+                          <button onClick={() => setEditingId(null)} style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            fontFamily: "var(--font-mono), monospace", fontSize: "11px",
+                            color: "#666",
+                          }}>Cancel</button>
+                        </div>
+                      ) : (
+                        <h2
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setEditDraft(node.title);
+                            setEditingId(node.id);
+                          }}
+                          style={{
+                            fontFamily: "'Bricolage Grotesque', sans-serif",
+                            fontSize: ds.titleSize, fontWeight: 800,
+                            color: ds.textColor,
+                            lineHeight: "1.15", letterSpacing: "-0.02em",
+                            margin: 0,
+                          }}
+                        >
+                          {node.title}
+                        </h2>
+                      )}
+
+                      <ExpandableText text={node.description} color={ds.mutedColor} />
+                    </div>
+
+                    {/* RIGHT COLUMN ~40% — THI gauge + score breakdown */}
+                    <div style={{ flex: "0 0 40%", minWidth: 0 }}>
+                      <div style={{ display: "flex", justifyContent: "center" }}>
+                        <THIGauge score={Math.round(node.thiScore)} size={160} />
+                      </div>
+
+                      {/* Score breakdown — always visible for all cards */}
+                      {nodeBreakdown && nodeBreakdown.length > 0 && (
+                        <div style={{ marginTop: "16px" }}>
+                          {nodeBreakdown.map((c) => (
+                            <BreakdownRow
+                              key={c.label}
+                              label={c.label}
+                              score={c.score}
+                              weight={c.weight}
+                            />
+                          ))}
+                          {/* THI formula */}
+                          <div style={{
+                            fontFamily: "var(--font-mono), monospace",
+                            fontSize: "9px", color: "#444",
+                            marginTop: "10px", lineHeight: "1.5",
+                          }}>
+                            THI = {nodeBreakdown.map((c) =>
+                              `(${Math.round(c.score)}×${c.weight.toFixed(2)})`
+                            ).join(" + ")} = {Math.round(node.thiScore)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── PILL ACTION ROW (below two-column header) ── */}
+                  <div style={{
+                    display: "flex", gap: "8px", marginTop: "20px", flexWrap: "wrap",
+                    borderTop: "1px solid #222", paddingTop: "16px",
+                  }}>
+                    {totalPlays > 0 && (
+                      <PillButton
+                        label={`Stocks & Startups (${totalPlays})`}
+                        isOpen={cardPanel === "plays"}
+                        onClick={() => togglePill(node.id, "plays")}
+                      />
+                    )}
+                    {node.depth < 2 && (
+                      <PillButton
+                        label="+ More Effects"
+                        isOpen={cardPanel === "effects"}
+                        onClick={() => togglePill(node.id, "effects")}
+                      />
+                    )}
+                  </div>
+
+                  {/* ── PANEL: Stocks & Startups ── */}
+                  {cardPanel === "plays" && totalPlays > 0 && (
+                    <div style={{
+                      marginTop: "16px", padding: "16px",
+                      background: "rgba(255,255,255,0.02)",
+                    }}>
+                      <div style={{
+                        display: "flex", gap: "16px", marginBottom: "14px",
+                        borderBottom: "1px solid #1a1a1a", paddingBottom: "8px",
+                      }}>
+                        {(["stocks", "startups"] as const).map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => setPlaysTabs((prev) => ({ ...prev, [node.id]: t }))}
+                            style={{
+                              background: "none", border: "none", cursor: "pointer",
+                              fontFamily: "var(--font-mono), monospace",
+                              fontSize: "10px", letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                              color: cardPlaysTab === t ? "var(--text)" : "#333",
+                              borderBottom: cardPlaysTab === t ? "1px solid var(--accent)" : "1px solid transparent",
+                              paddingBottom: "4px",
+                            }}
+                          >
+                            {t === "stocks" ? `Stocks (${node.equityBets.length})` : `Startups (${node.startupOpportunities.length})`}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Stocks */}
+                      {cardPlaysTab === "stocks" && (
+                        <div style={{ maxHeight: "500px", overflowY: "auto" }}>
+                          {node.equityBets.map((bet) => {
+                            const efs = efsMap[bet.id];
+                            const isBetExpanded = cardExpandedBet === bet.id;
+                            return (
+                              <div key={bet.id} style={{
+                                marginBottom: "12px", paddingBottom: "12px",
+                                borderBottom: "1px solid #1a1a1a",
+                              }}>
+                                {/* Stock header row */}
+                                <div
+                                  onClick={() => setExpandedBetIds((prev) => ({
+                                    ...prev,
+                                    [node.id]: isBetExpanded ? null : bet.id,
+                                  }))}
+                                  style={{ cursor: "pointer" }}
+                                >
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                                    <a
+                                      href={`https://finance.yahoo.com/quote/${bet.ticker}`}
+                                      target="_blank" rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      style={{
+                                        fontFamily: "var(--font-mono), monospace",
+                                        fontSize: "14px", fontWeight: 700,
+                                        color: "var(--accent)", textDecoration: "none",
+                                      }}
+                                    >
+                                      {bet.ticker}
+                                    </a>
+                                    <span style={{
+                                      fontFamily: "var(--font-inter), sans-serif",
+                                      fontSize: "12px", color: "#888",
+                                    }}>
+                                      {bet.companyName}
+                                    </span>
+                                    <span style={{
+                                      fontFamily: "var(--font-mono), monospace",
+                                      fontSize: "9px", letterSpacing: "0.06em",
+                                      padding: "2px 6px",
+                                      border: "1px solid",
+                                      borderColor: bet.role === "BENEFICIARY" ? "var(--accent)" : bet.role === "HEADWIND" ? "#666" : "#F59E0B",
+                                      color: bet.role === "BENEFICIARY" ? "var(--accent)" : bet.role === "HEADWIND" ? "#666" : "#F59E0B",
+                                      textTransform: "uppercase",
+                                    }}>
+                                      {bet.role}
+                                    </span>
+                                    {efs && (
+                                      <span style={{
+                                        fontFamily: "var(--font-mono), monospace",
+                                        fontSize: "13px", fontWeight: 700,
+                                        color: "#FF4500", marginLeft: "auto",
+                                      }}>
+                                        {Math.round(efs.efsScore)} / 100
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: "11px", color: "#555", lineHeight: "1.4", marginBottom: "6px" }}>
+                                    {bet.rationale}
+                                  </div>
+                                  {efs && (
+                                    <GradientBar value={efs.efsScore} height={4} />
+                                  )}
+                                </div>
+
+                                {/* Expanded EFS sub-score breakdown */}
+                                {isBetExpanded && efs && (
+                                  <div style={{
+                                    marginTop: "12px", padding: "12px",
+                                    background: "rgba(0,0,0,0.3)",
+                                  }}>
+                                    {EFS_COMPONENTS.map((comp) => {
+                                      const val = efs[comp.key];
+                                      return (
+                                        <BreakdownRow
+                                          key={comp.key}
+                                          label={comp.label}
+                                          score={val}
+                                          weight={comp.weight}
+                                          detail={getEfsDetail(comp.key, efs)}
+                                        />
+                                      );
+                                    })}
+                                    {/* EFS formula */}
+                                    <div style={{
+                                      fontFamily: "var(--font-mono), monospace",
+                                      fontSize: "9px", color: "#444",
+                                      marginTop: "10px", lineHeight: "1.5",
+                                    }}>
+                                      EFS = {EFS_COMPONENTS.map((c) =>
+                                        `(${Math.round(efs[c.key])}×${c.weight.toFixed(2)})`
+                                      ).join(" + ")} = {Math.round(efs.efsScore)}
+                                    </div>
+                                    {/* Role tag */}
+                                    <div style={{
+                                      marginTop: "8px",
+                                      display: "inline-block",
+                                      padding: "3px 8px",
+                                      border: "1px solid var(--accent)",
+                                      fontFamily: "var(--font-mono), monospace",
+                                      fontSize: "9px", letterSpacing: "0.06em",
+                                      color: "var(--accent)", textTransform: "uppercase",
+                                    }}>
+                                      {bet.role}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Startups */}
+                      {cardPlaysTab === "startups" && (
+                        <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                          {node.startupOpportunities.map((opp) => {
+                            const sts = stsMap[opp.id];
+                            return (
+                              <div key={opp.id} style={{
+                                marginBottom: "10px", paddingBottom: "10px",
+                                borderBottom: "1px solid #1a1a1a",
+                              }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                                  <span style={{
+                                    fontFamily: "var(--font-inter), sans-serif",
+                                    fontSize: "13px", fontWeight: 600, color: "var(--text)",
+                                  }}>
+                                    {opp.name}
+                                  </span>
+                                  <span style={{
+                                    fontFamily: "var(--font-mono), monospace",
+                                    fontSize: "10px", letterSpacing: "0.06em",
+                                    color: opp.timing === "RIGHT_TIMING" ? "var(--accent)" : "#666",
+                                    textTransform: "uppercase",
+                                  }}>
+                                    {opp.timing.replace(/_/g, " ")}
+                                  </span>
+                                  {sts && (
+                                    <span style={{
+                                      fontFamily: "var(--font-mono), monospace",
+                                      fontSize: "11px", fontWeight: 700,
+                                      color: "var(--text)", marginLeft: "auto",
+                                    }}>
+                                      STS {Math.round(sts.stsScore)} / 100
+                                    </span>
+                                  )}
+                                </div>
+                                {sts && (
+                                  <div style={{ marginBottom: "4px" }}>
+                                    <GradientBar value={sts.stsScore} height={3} />
+                                  </div>
+                                )}
+                                <div style={{ fontSize: "11px", color: "#555", lineHeight: "1.4" }}>
+                                  {opp.oneLiner}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── PANEL: More Effects ── */}
+                  {cardPanel === "effects" && node.depth < 2 && (
+                    <div style={{
+                      marginTop: "16px", padding: "16px",
+                      background: "rgba(255,255,255,0.02)",
+                    }}>
+                      {node.children.length === 0 ? (
+                        <button
+                          onClick={() => handleGenerateEffects(node.depth + 2)}
+                          disabled={generatingFor !== null}
+                          style={{
+                            background: "none", border: "1px solid #333",
+                            padding: "8px 16px", cursor: generatingFor ? "wait" : "pointer",
+                            fontFamily: "var(--font-mono), monospace",
+                            fontSize: "11px", color: ds.textColor,
+                            letterSpacing: "0.04em",
+                          }}
+                        >
+                          {generatingFor === `gen-${node.depth + 2}` ? "Generating..." : "+ Expand this thesis"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleGenerateEffects(node.depth === 0 ? 2 : 3)}
+                          disabled={generatingFor !== null}
+                          style={{
+                            background: "none", border: "1px solid #333",
+                            padding: "8px 16px", cursor: generatingFor ? "wait" : "pointer",
+                            fontFamily: "var(--font-mono), monospace",
+                            fontSize: "11px", color: ds.textColor,
+                            letterSpacing: "0.04em",
+                          }}
+                        >
+                          {generatingFor ? "Generating..." : `+ Generate more ${node.depth === 0 ? "2nd" : "3rd"} order effects`}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-          <div style={{ borderTop: "1px solid var(--border)", margin: "8px 0" }} />
-          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)" }}>
-            Momentum = {mFormula} = {Math.round(m.score)}
-          </div>
-        </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Helper: EFS detail text ─────────────────────────────────────────────────
+
+function getEfsDetail(key: string, efs: EFSScore): string {
+  switch (key) {
+    case "revenueAlignmentScore":
+      return efs.revenueAlignmentPct != null
+        ? `${Math.round(efs.revenueAlignmentPct)}% revenue from ${efs.segmentCount ?? "?"} aligned segments`
+        : "Revenue alignment data unavailable";
+    case "thesisBetaScore":
+      return efs.thesisBetaRaw != null
+        ? `Raw beta: ${efs.thesisBetaRaw.toFixed(2)} vs thesis`
+        : "Thesis beta data unavailable";
+    case "momentumAlignmentScore":
+      return efs.momentumDirection
+        ? `${efs.momentumDirection} momentum — stock ${efs.stockReturn90d != null ? (efs.stockReturn90d > 0 ? "+" : "") + efs.stockReturn90d.toFixed(1) + "%" : "?"} / THI ${efs.thiDelta90d != null ? (efs.thiDelta90d > 0 ? "+" : "") + efs.thiDelta90d.toFixed(1) : "?"} (90d)`
+        : "Momentum data unavailable";
+    case "valuationBufferScore":
+      return efs.forwardPE != null && efs.sectorMedianPE != null
+        ? `Fwd P/E ${efs.forwardPE.toFixed(1)}× vs sector median ${efs.sectorMedianPE.toFixed(1)}×`
+        : "Valuation data unavailable";
+    case "signalPurityScore":
+      return efs.dataSourcesUsed.length > 0
+        ? `Sources: ${efs.dataSourcesUsed.join(", ")}`
+        : "Signal purity data unavailable";
+    default:
+      return "";
+  }
+}
+
+// ─── Helper: Build Tree ─────────────────────────────────────────────────────
+
+function buildTree(thesis: ThesisDetail): CardNode {
+  const heroChildren: CardNode[] = [];
+  thesis.effects.forEach((effect) => {
+    heroChildren.push(buildEffectNode(effect, 1));
+  });
+  return {
+    id: "hero",
+    type: "hero",
+    depth: 0,
+    order: 0,
+    title: thesis.title,
+    description: thesis.description,
+    thiScore: thesis.thi.score,
+    equityBets: thesis.equityBets,
+    startupOpportunities: thesis.startupOpportunities,
+    children: heroChildren,
+  };
+}
+
+function buildEffectNode(effect: Effect, depth: number): CardNode {
+  const children: CardNode[] = (effect.childEffects || []).map((child) =>
+    buildEffectNode(child, depth + 1)
+  );
+  return {
+    id: `effect-${effect.id}`,
+    type: "effect",
+    depth,
+    order: effect.order,
+    title: effect.title,
+    description: effect.description,
+    thiScore: effect.thi.score,
+    equityBets: effect.equityBets,
+    startupOpportunities: effect.startupOpportunities,
+    effectId: effect.id,
+    children,
+  };
+}
+
+// ─── Helper: Flatten Tree ───────────────────────────────────────────────────
+
+function flattenTree(root: CardNode): CardNode[] {
+  const result: CardNode[] = [root];
+  for (const child of root.children) flattenRec(child, result);
+  return result;
+}
+
+function flattenRec(node: CardNode, result: CardNode[]) {
+  result.push(node);
+  for (const child of node.children) flattenRec(child, result);
+}
+
+// ─── THI Gauge — Canvas, matching original Needle gradient ───────────────────
+
+function THIGauge({ score, size = 160 }: { score: number; size?: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const height = Math.round(size * 0.65);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, size, height);
+
+    const cx = size / 2;
+    const cy = height - 4;
+    const radius = size / 2 - 8;
+    const s = Math.max(0, Math.min(100, score));
+    const needleAngle = Math.PI + (s / 100) * Math.PI;
+    const nx = cx + radius * Math.cos(needleAngle);
+    const ny = cy + radius * Math.sin(needleAngle);
+
+    // WEDGE — cubic ease-in orange gradient (exact values from Needle.tsx)
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius - 4, Math.PI, needleAngle, false);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(cx - radius, 0, cx + radius, 0);
+    const maxOpacity = 0.65;
+    const fullAt = 0.72;
+    for (let i = 0; i <= 100; i++) {
+      const t = i / 100;
+      const eased = t < fullAt ? Math.pow(t / fullAt, 3) * maxOpacity : maxOpacity;
+      grad.addColorStop(t, `rgba(255,69,0,${eased.toFixed(4)})`);
+    }
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+
+    // ARC OUTLINE
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI, false);
+    ctx.strokeStyle = "rgba(255,255,255,0.13)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // TICK MARKS at 0, 50, 100
+    [0, 50, 100].forEach(v => {
+      const a = Math.PI + (v / 100) * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(cx + (radius - 8) * Math.cos(a), cy + (radius - 8) * Math.sin(a));
+      ctx.lineTo(cx + (radius + 3) * Math.cos(a), cy + (radius + 3) * Math.sin(a));
+      ctx.strokeStyle = "rgba(255,255,255,0.22)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+
+    // NEEDLE LINE
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(nx, ny);
+    ctx.strokeStyle = "#FF4500";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    // PIVOT DOT
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fillStyle = "#FF4500";
+    ctx.fill();
+
+    // TIP DOT
+    ctx.beginPath();
+    ctx.arc(nx, ny, 3, 0, Math.PI * 2);
+    ctx.fillStyle = "#FF4500";
+    ctx.fill();
+  }, [score, size, height]);
+
+  return (
+    <div style={{ textAlign: "center" }}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: size, height, display: "block" }}
+      />
+      <div style={{
+        fontFamily: "var(--font-mono), monospace",
+        fontSize: "20px",
+        fontWeight: 700,
+        color: "#FF4500",
+        marginTop: "2px",
+      }}>
+        {score}
+      </div>
+    </div>
+  );
+}
+
+// ─── Breakdown Row (THI sub-scores + EFS sub-scores) ─────────────────────────
+
+function BreakdownRow({ label, score, weight, detail }: {
+  label: string; score: number; weight: number; detail?: string;
+}) {
+  const pctLabel = `${Math.round(weight * 100)}%`;
+  return (
+    <div style={{ marginBottom: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px" }}>
+        <span style={{
+          fontFamily: "var(--font-mono), monospace",
+          fontSize: "9px", letterSpacing: "0.08em",
+          color: "#555", textTransform: "uppercase",
+          flex: 1,
+        }}>
+          {label}
+        </span>
+        <span style={{
+          fontFamily: "var(--font-mono), monospace",
+          fontSize: "9px", color: "#444",
+        }}>
+          {pctLabel}
+        </span>
+        <span style={{
+          fontFamily: "var(--font-mono), monospace",
+          fontSize: "12px", fontWeight: 700,
+          color: "#FF4500",
+        }}>
+          &rarr; {Math.round(score)}
+        </span>
+      </div>
+      <GradientBar value={score} height={4} />
+      {detail && (
+        <div style={{
+          fontFamily: "var(--font-inter), sans-serif",
+          fontSize: "10px", color: "#444",
+          fontStyle: "italic", marginTop: "3px",
+          lineHeight: "1.4",
+        }}>
+          {detail}
+        </div>
       )}
     </div>
   );
 }
 
-function DataQualityColumn({ breakdown }: { breakdown: ScoringBreakdown }) {
-  const dq = breakdown.dataQuality;
-  const dqFormula = `(${Math.round(dq.agreement.score)}×0.50) + (${Math.round(dq.freshness.score)}×0.30) + (${Math.round(dq.sourceQuality.score)}×0.20)`;
+// ─── Pill Button ─────────────────────────────────────────────────────────────
 
-  return (
-    <div
-      className="border p-5"
-      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-    >
-      <div className="mb-3">
-        <div className="flex items-center justify-between">
-          <span className="uppercase font-bold" style={{ color: "var(--text)", letterSpacing: "0.08em", fontSize: "13px" }}>
-            DATA QUALITY SCORE: {Math.round(dq.score)} / 100
-          </span>
-        </div>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-          Weight in final THI: 20%
-        </div>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--accent)", marginTop: "2px" }}>
-          Contribution to THI: {Math.round(dq.score)} × 0.20 = {dq.contribution} points
-        </div>
-      </div>
-      <div className="flex justify-center mb-4">
-        <Needle score={dq.score} size="sm" label="" animated={true} />
-      </div>
-      <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", fontStyle: "italic" }}>
-        How it&apos;s calculated:
-      </div>
-      <div className="flex flex-col gap-4">
-        {/* Agreement */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <span style={{ color: "var(--text)", fontSize: "11px" }}>
-              Feed Agreement (50% of Quality)
-            </span>
-            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
-              {Math.round(dq.agreement.score)}
-            </span>
-          </div>
-          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.5" }}>
-            {dq.agreement.scoredCount > 0 ? (
-              <>
-                {dq.agreement.scoredCount} of {dq.agreement.totalCount} feeds returning scores.
-                <br />
-                {dq.agreement.pctConfirming != null && `${dq.agreement.pctConfirming}% of scored feeds pointing confirming.`}
-              </>
-            ) : (
-              "— no scored feeds yet"
-            )}
-          </div>
-        </div>
-
-        {/* Freshness */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <span style={{ color: "var(--text)", fontSize: "11px" }}>
-              Data Freshness (30% of Quality)
-            </span>
-            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
-              {Math.round(dq.freshness.score)}
-            </span>
-          </div>
-          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.5" }}>
-            {dq.freshness.degraded > 0 && `${dq.freshness.degraded} feeds degraded (no recent data). `}
-            {dq.freshness.avgAgeDays != null ? `Avg data age: ${dq.freshness.avgAgeDays}d. ` : ""}
-            {dq.freshness.live} live / {dq.freshness.stale} stale / {dq.freshness.degraded} degraded.
-            {dq.freshness.score === 0 && <><br />Score: 0 — fix feeds to improve this.</>}
-          </div>
-        </div>
-
-        {/* Source Quality */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <span style={{ color: "var(--text)", fontSize: "11px" }}>
-              Source Quality (20% of Quality)
-            </span>
-            <span style={{ color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", fontSize: "13px" }}>
-              {Math.round(dq.sourceQuality.score)}
-            </span>
-          </div>
-          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.5" }}>
-            Active sources: {dq.sourceQuality.activeSources.length > 0
-              ? dq.sourceQuality.activeSources.map(s => `${s} (${s === "FRED" ? "100" : s === "GTRENDS" ? "65" : "50"})`).join(", ")
-              : "none yet"}
-            <br />
-            Weighted avg: {dq.sourceQuality.weightedAvg}/100 → score {Math.round(dq.sourceQuality.score)}
-          </div>
-        </div>
-      </div>
-      <div style={{ borderTop: "1px solid var(--border)", margin: "8px 0" }} />
-      <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "11px", color: "var(--text-muted)" }}>
-        Quality = {dqFormula} = {Math.round(dq.score)}
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   TABS
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function TabButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function PillButton({ label, isOpen, onClick }: { label: string; isOpen: boolean; onClick: () => void }) {
   return (
     <button
-      onClick={onClick}
-      className="uppercase pb-1"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
       style={{
-        color: active ? "var(--accent)" : "var(--text-muted)",
-        letterSpacing: "0.08em",
-        fontSize: "13px",
-        background: "none",
-        border: "none",
-        borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
+        display: "inline-flex", alignItems: "center", gap: "4px",
+        padding: "6px 14px",
+        background: isOpen ? "rgba(255,69,0,0.12)" : "transparent",
+        border: isOpen ? "1px solid #FF4500" : "1px solid #333",
         cursor: "pointer",
+        fontFamily: "var(--font-mono), monospace",
+        fontSize: "10px", fontWeight: 700,
+        letterSpacing: "0.06em",
+        color: isOpen ? "#FF4500" : "#888",
+        textTransform: "uppercase",
       }}
     >
-      {label}
+      {isOpen ? "▾" : "▸"} {label}
     </button>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   EFFECT THUMBNAILS
-   ═══════════════════════════════════════════════════════════════════════════ */
+// ─── Expandable Text ────────────────────────────────────────────────────────
 
-function EffectThumbnail({
-  effect,
-  thesisId,
-  onDeleted,
-}: {
-  effect: Effect;
-  thesisId: string;
-  onDeleted: () => void;
-}) {
-  const tickers = effect.equityBets.map((b) => b.ticker);
-
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!confirm(`Delete "${effect.title}"? This cannot be undone.`)) return;
-    await api.deleteEffect(effect.id);
-    onDeleted();
-  };
+function ExpandableText({ text, color }: { text: string; color: string }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!text) return null;
+  const isLong = text.length > 200;
 
   return (
-    <Link
-      href={`/thesis/${thesisId}/effect/${effect.id}`}
-      className="border p-5 block hover:opacity-80"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--border)",
-        textDecoration: "none",
-        cursor: "pointer",
-      }}
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-2">
-            <h4
-              className="font-bold uppercase"
-              style={{
-                color: "var(--text)",
-                letterSpacing: "-0.03em",
-                lineHeight: "1.3",
-                fontSize: "14px",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {effect.title}
-            </h4>
-            <button
-              onClick={handleDelete}
-              className="flex-shrink-0 mt-0.5"
-              style={{
-                color: "var(--text-muted)",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-              }}
-              title="Delete effect"
-            >
-              <TrashIcon size={14} />
-            </button>
-          </div>
-          <p
-            className="mt-1"
-            style={{
-              color: "var(--text-muted)",
-              lineHeight: "1.5",
-              fontSize: "13px",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {effect.description}
-          </p>
-        </div>
-        <div className="flex-shrink-0 flex flex-col items-center">
-          <Needle score={effect.thi.score} size="sm" />
-          <span
-            style={{
-              color: "var(--text-muted)",
-              fontFamily: "JetBrains Mono, monospace",
-              fontSize: "11px",
-              marginTop: "2px",
-            }}
-          >
-            THI
-          </span>
-        </div>
-      </div>
-      {tickers.length > 0 && (
-        <div
-          className="mt-3"
-          style={{
-            fontFamily: "JetBrains Mono, monospace",
-            fontSize: "13px",
-          }}
-        >
-          {tickers.map((t, i) => (
-            <span key={t}>
-              <span style={{ color: "#FF4500" }}>{t}</span>
-              {i < tickers.length - 1 && (
-                <span style={{ color: "#5A5A5A" }}> · </span>
-              )}
-            </span>
-          ))}
-        </div>
-      )}
-    </Link>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   ADD EFFECT BUTTON
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function AddEffectButton({
-  thesisId,
-  onCreated,
-}: {
-  thesisId: string;
-  onCreated: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-
-  const handleSubmit = async () => {
-    if (!title || !description) return;
-    await api.createEffect(thesisId, { title, description, order: 2 });
-    setTitle("");
-    setDescription("");
-    setOpen(false);
-    onCreated();
-  };
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="uppercase"
-        style={{
-          color: "var(--text-muted)",
-          letterSpacing: "0.08em",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          textDecoration: "underline",
-          textUnderlineOffset: "3px",
-          fontSize: "13px",
-        }}
-      >
-        + ADD 2ND ORDER EFFECT
-      </button>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Effect title"
-        className="px-2 py-1 border"
-        style={{
-          background: "var(--bg)",
-          borderColor: "var(--border)",
-          color: "var(--text)",
-          outline: "none",
-          fontSize: "14px",
-        }}
-      />
-      <input
-        type="text"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Description"
-        className="px-2 py-1 border flex-1"
-        style={{
-          background: "var(--bg)",
-          borderColor: "var(--border)",
-          color: "var(--text)",
-          outline: "none",
-          fontSize: "14px",
-        }}
-        onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-      />
-      <button
-        onClick={handleSubmit}
-        className="uppercase px-2 py-1 border"
-        style={{
-          color: "var(--text)",
-          borderColor: "var(--text)",
-          background: "none",
-          cursor: "pointer",
-          letterSpacing: "0.08em",
-          fontSize: "13px",
-        }}
-      >
-        ADD
-      </button>
-      <button
-        onClick={() => setOpen(false)}
-        style={{
-          color: "var(--text-muted)",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        <TrashIcon size={14} />
-      </button>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   PORTFOLIO TRACKER
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-const INTERPRETATION_LABELS: Record<string, { label: string; color: string; desc: string }> = {
-  ALIGNED_WINNING: { label: "ALIGNED & WINNING", color: "#22C55E", desc: "THI is strong and your portfolio is performing — thesis is validated by both data and market." },
-  THESIS_STRONG_PORTFOLIO_WEAK: { label: "THESIS STRONG, PORTFOLIO WEAK", color: "#FF4500", desc: "Data supports this thesis but your positions haven't moved yet — potential buying opportunity or wrong picks." },
-  THESIS_WEAK_PORTFOLIO_STRONG: { label: "THESIS WEAK, PORTFOLIO STRONG", color: "#F59E0B", desc: "Your positions are up but the underlying thesis is weakening — consider taking profits." },
-  ALIGNED_LOSING: { label: "ALIGNED & LOSING", color: "#EF4444", desc: "Both THI and portfolio are down — thesis may be wrong or too early." },
-  NEUTRAL: { label: "NEUTRAL", color: "var(--text-muted)", desc: "No strong signal in either direction." },
-};
-
-function PortfolioTracker({
-  thesisId,
-  portfolio,
-  isOpen,
-  onToggle,
-  onReload,
-}: {
-  thesisId: string;
-  portfolio: Portfolio | null;
-  isOpen: boolean;
-  onToggle: () => void;
-  onReload: () => void;
-}) {
-  const [addingPosition, setAddingPosition] = useState(false);
-  const [ticker, setTicker] = useState("");
-  const [shares, setShares] = useState("");
-  const [entryPrice, setEntryPrice] = useState("");
-  const [isShort, setIsShort] = useState(false);
-
-  const hasPositions = portfolio && portfolio.positions.length > 0;
-
-  const handleAddPosition = async () => {
-    if (!ticker || !shares || !entryPrice) return;
-    await api.addPosition(thesisId, {
-      ticker: ticker.toUpperCase(),
-      shares: parseFloat(shares),
-      entry_price: parseFloat(entryPrice),
-      is_short: isShort,
-    });
-    setTicker("");
-    setShares("");
-    setEntryPrice("");
-    setIsShort(false);
-    setAddingPosition(false);
-    onReload();
-  };
-
-  const handleDeletePosition = async (positionId: string) => {
-    if (!confirm("Remove this position?")) return;
-    await api.deletePosition(positionId);
-    onReload();
-  };
-
-  const interp = portfolio ? INTERPRETATION_LABELS[portfolio.interpretation] || INTERPRETATION_LABELS.NEUTRAL : INTERPRETATION_LABELS.NEUTRAL;
-
-  return (
-    <div className="mb-6">
-      <div className="flex items-center gap-4 mb-4">
+    <div style={{ marginTop: "12px" }}>
+      <p style={{
+        fontSize: "14px", lineHeight: "1.6", color,
+        display: expanded ? "block" : "-webkit-box",
+        WebkitLineClamp: expanded ? undefined : 2,
+        WebkitBoxOrient: "vertical" as const,
+        overflow: expanded ? "visible" : "hidden",
+        margin: 0,
+      }}>
+        {text}
+      </p>
+      {isLong && (
         <button
-          onClick={onToggle}
-          className="uppercase flex items-center gap-2"
+          onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
           style={{
-            color: hasPositions ? "var(--accent)" : "var(--text-muted)",
-            letterSpacing: "0.08em",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "13px",
+            background: "none", border: "none", cursor: "pointer",
+            fontFamily: "var(--font-mono), monospace",
+            fontSize: "10px", color, letterSpacing: "0.04em",
+            marginTop: "4px", padding: 0, opacity: 0.7,
           }}
         >
-          {hasPositions ? "PORTFOLIO TRACKER" : "TRACK THIS THESIS"}{" "}
-          <span style={{ fontSize: "12px" }}>{isOpen ? "▲" : "▾"}</span>
+          {expanded ? "Show less" : "Read more"}
         </button>
-        {hasPositions && portfolio && (
-          <span
-            style={{
-              fontFamily: "JetBrains Mono, monospace",
-              fontSize: "13px",
-              color: portfolio.totalPnl >= 0 ? "#22C55E" : "#EF4444",
-            }}
-          >
-            {portfolio.totalPnl >= 0 ? "+" : ""}{portfolio.totalPnlPct.toFixed(1)}% (${portfolio.totalPnl.toFixed(0)})
-          </span>
-        )}
-      </div>
-
-      {isOpen && (
-        <div
-          className="border p-5 mb-4"
-          style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-        >
-          {/* Interpretation banner */}
-          {hasPositions && (
-            <div className="mb-4 pb-3" style={{ borderBottom: "1px solid var(--border)" }}>
-              <div className="flex items-center gap-3 mb-1">
-                <span
-                  className="uppercase font-bold"
-                  style={{ color: interp.color, letterSpacing: "0.08em", fontSize: "12px" }}
-                >
-                  {interp.label}
-                </span>
-                <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px", color: "var(--text-muted)" }}>
-                  THI {Math.round(portfolio!.thiScore)} · P&L {portfolio!.totalPnlPct >= 0 ? "+" : ""}{portfolio!.totalPnlPct.toFixed(1)}%
-                </span>
-              </div>
-              <p style={{ color: "var(--text-muted)", fontSize: "11px", lineHeight: "1.4" }}>
-                {interp.desc}
-              </p>
-            </div>
-          )}
-
-          {/* Position list */}
-          {hasPositions && (
-            <div className="mb-4">
-              <div
-                className="grid mb-2 uppercase"
-                style={{
-                  gridTemplateColumns: "80px 1fr 80px 80px 80px 30px",
-                  gap: "8px",
-                  color: "var(--text-muted)",
-                  letterSpacing: "0.08em",
-                  fontSize: "10px",
-                }}
-              >
-                <span>TICKER</span>
-                <span>SHARES × ENTRY</span>
-                <span>CURRENT</span>
-                <span>P&L</span>
-                <span>P&L %</span>
-                <span />
-              </div>
-              {portfolio!.positions.map((p) => (
-                <div
-                  key={p.id}
-                  className="grid items-center"
-                  style={{
-                    gridTemplateColumns: "80px 1fr 80px 80px 80px 30px",
-                    gap: "8px",
-                    fontFamily: "JetBrains Mono, monospace",
-                    fontSize: "12px",
-                    lineHeight: "2",
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                >
-                  <span style={{ color: p.isShort ? "#EF4444" : "var(--accent)" }}>
-                    {p.isShort ? "▼" : ""}{p.ticker}
-                  </span>
-                  <span style={{ color: "var(--text-muted)" }}>
-                    {p.shares} × ${p.entryPrice.toFixed(2)}
-                  </span>
-                  <span style={{ color: "var(--text)" }}>
-                    ${(p.currentPrice || p.entryPrice).toFixed(2)}
-                  </span>
-                  <span style={{ color: (p.pnl || 0) >= 0 ? "#22C55E" : "#EF4444" }}>
-                    {(p.pnl || 0) >= 0 ? "+" : ""}${(p.pnl || 0).toFixed(0)}
-                  </span>
-                  <span style={{ color: (p.pnlPct || 0) >= 0 ? "#22C55E" : "#EF4444" }}>
-                    {(p.pnlPct || 0) >= 0 ? "+" : ""}{(p.pnlPct || 0).toFixed(1)}%
-                  </span>
-                  <button
-                    onClick={() => handleDeletePosition(p.id)}
-                    style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
-                  >
-                    <TrashIcon size={12} />
-                  </button>
-                </div>
-              ))}
-              <div
-                className="grid mt-2 font-bold"
-                style={{
-                  gridTemplateColumns: "80px 1fr 80px 80px 80px 30px",
-                  gap: "8px",
-                  fontFamily: "JetBrains Mono, monospace",
-                  fontSize: "12px",
-                }}
-              >
-                <span style={{ color: "var(--text)" }}>TOTAL</span>
-                <span style={{ color: "var(--text-muted)" }}>
-                  Cost: ${portfolio!.totalCost.toFixed(0)}
-                </span>
-                <span style={{ color: "var(--text)" }}>
-                  ${portfolio!.totalValue.toFixed(0)}
-                </span>
-                <span style={{ color: portfolio!.totalPnl >= 0 ? "#22C55E" : "#EF4444" }}>
-                  {portfolio!.totalPnl >= 0 ? "+" : ""}${portfolio!.totalPnl.toFixed(0)}
-                </span>
-                <span style={{ color: portfolio!.totalPnlPct >= 0 ? "#22C55E" : "#EF4444" }}>
-                  {portfolio!.totalPnlPct >= 0 ? "+" : ""}{portfolio!.totalPnlPct.toFixed(1)}%
-                </span>
-                <span />
-              </div>
-            </div>
-          )}
-
-          {/* Add position form */}
-          {addingPosition ? (
-            <div className="flex items-center gap-2 flex-wrap">
-              <input
-                type="text"
-                value={ticker}
-                onChange={(e) => setTicker(e.target.value)}
-                placeholder="TICKER"
-                className="px-2 py-1 border"
-                style={{
-                  background: "var(--bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                  outline: "none",
-                  fontSize: "13px",
-                  width: "80px",
-                  fontFamily: "JetBrains Mono, monospace",
-                }}
-              />
-              <input
-                type="number"
-                value={shares}
-                onChange={(e) => setShares(e.target.value)}
-                placeholder="Shares"
-                className="px-2 py-1 border"
-                style={{
-                  background: "var(--bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                  outline: "none",
-                  fontSize: "13px",
-                  width: "80px",
-                  fontFamily: "JetBrains Mono, monospace",
-                }}
-              />
-              <input
-                type="number"
-                value={entryPrice}
-                onChange={(e) => setEntryPrice(e.target.value)}
-                placeholder="Entry $"
-                className="px-2 py-1 border"
-                style={{
-                  background: "var(--bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                  outline: "none",
-                  fontSize: "13px",
-                  width: "90px",
-                  fontFamily: "JetBrains Mono, monospace",
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleAddPosition()}
-              />
-              <label
-                className="flex items-center gap-1 uppercase"
-                style={{ color: "var(--text-muted)", fontSize: "11px", letterSpacing: "0.08em", cursor: "pointer" }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isShort}
-                  onChange={(e) => setIsShort(e.target.checked)}
-                  style={{ accentColor: "var(--accent)" }}
-                />
-                SHORT
-              </label>
-              <button
-                onClick={handleAddPosition}
-                className="uppercase px-2 py-1 border"
-                style={{
-                  color: "var(--text)",
-                  borderColor: "var(--text)",
-                  background: "none",
-                  cursor: "pointer",
-                  letterSpacing: "0.08em",
-                  fontSize: "12px",
-                }}
-              >
-                ADD
-              </button>
-              <button
-                onClick={() => setAddingPosition(false)}
-                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
-              >
-                <TrashIcon size={14} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setAddingPosition(true)}
-              className="uppercase"
-              style={{
-                color: "var(--text-muted)",
-                letterSpacing: "0.08em",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                textDecoration: "underline",
-                textUnderlineOffset: "3px",
-                fontSize: "12px",
-              }}
-            >
-              + ADD POSITION
-            </button>
-          )}
-        </div>
       )}
     </div>
   );

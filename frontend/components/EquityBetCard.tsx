@@ -16,11 +16,13 @@ function EFSBreakdownRow({
   weightPct,
   score,
   explanation,
+  sourceUrl,
 }: {
   label: string;
   weightPct: number;
   score: number;
   explanation: string;
+  sourceUrl?: string;
 }) {
   return (
     <div className="mb-3">
@@ -34,7 +36,20 @@ function EFSBreakdownRow({
             minWidth: "160px",
           }}
         >
-          {label}
+          {sourceUrl ? (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "var(--text-muted)", textDecoration: "none" }}
+              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+            >
+              {label} ↗
+            </a>
+          ) : (
+            label
+          )}
         </span>
         <span
           style={{
@@ -121,31 +136,37 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
 
   return (
     <div
-      className="border-b border-r flex flex-col"
-      style={{ background: "var(--surface)", borderColor: "var(--border)", overflow: "hidden" }}
+      className="flex flex-col"
+      style={{ background: "#1C1C1C", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "4px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.5)" }}
     >
       {/* Header row: Ticker */}
-      <div className="flex items-center gap-3 px-5 pt-5 pb-2">
-        <span
+      <div className="flex items-center gap-3 px-3 pt-4 pb-2">
+        <a
+          href={`https://finance.yahoo.com/quote/${bet.ticker}`}
+          target="_blank"
+          rel="noopener noreferrer"
           className="font-bold"
           style={{
             color: "var(--accent)",
             fontFamily: "JetBrains Mono, monospace",
             fontSize: "24px",
             letterSpacing: "-0.02em",
+            textDecoration: "none",
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+          onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
         >
-          {bet.ticker}
-        </span>
+          {bet.ticker} ↗
+        </a>
       </div>
 
       {/* Sparkline row: full card width */}
-      <div className="px-5">
+      <div className="px-3">
         <StockSparkline ticker={bet.ticker} />
       </div>
 
       {/* EFS Score Bar */}
-      <div className="px-5 pt-3">
+      <div className="px-3 pt-3">
         {efs ? (
           <>
             <button
@@ -189,12 +210,13 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
                     className="uppercase"
                     style={{
                       color: "#FF4500",
-                      fontSize: "10px",
-                      letterSpacing: "0.08em",
+                      fontSize: "9px",
+                      letterSpacing: "0.06em",
                       flexShrink: 0,
+                      opacity: 0.8,
                     }}
                   >
-                    HIGHEST CONVICTION
+                    TOP 3
                   </span>
                 )}
                 <span style={{ color: "var(--text-muted)", fontSize: "10px", marginLeft: "auto" }}>
@@ -237,30 +259,35 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
                   weightPct={30}
                   score={efs.revenueAlignmentScore}
                   explanation={buildExplanation(efs, "revenue")}
+                  sourceUrl={`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${encodeURIComponent(bet.ticker)}&type=10-K&dateb=&owner=include&count=10`}
                 />
                 <EFSBreakdownRow
                   label="Thesis Beta"
                   weightPct={25}
                   score={efs.thesisBetaScore}
                   explanation={buildExplanation(efs, "beta")}
+                  sourceUrl={`https://finance.yahoo.com/quote/${bet.ticker}/history/`}
                 />
                 <EFSBreakdownRow
                   label="Momentum Alignment"
                   weightPct={20}
                   score={efs.momentumAlignmentScore}
                   explanation={buildExplanation(efs, "momentum")}
+                  sourceUrl={`https://finance.yahoo.com/quote/${bet.ticker}/`}
                 />
                 <EFSBreakdownRow
                   label="Valuation Buffer"
                   weightPct={15}
                   score={efs.valuationBufferScore}
                   explanation={buildExplanation(efs, "valuation")}
+                  sourceUrl={`https://finance.yahoo.com/quote/${bet.ticker}/key-statistics/`}
                 />
                 <EFSBreakdownRow
                   label="Signal Purity"
                   weightPct={10}
                   score={efs.signalPurityScore}
                   explanation={buildExplanation(efs, "purity")}
+                  sourceUrl={`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${encodeURIComponent(bet.ticker)}&type=10-K&dateb=&owner=include&count=10`}
                 />
 
                 <div
@@ -301,10 +328,10 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
       </div>
 
       {/* Body */}
-      <div className="px-5 pt-3 pb-5 flex flex-col flex-1">
+      <div className="px-3 pt-3 pb-4 flex flex-col flex-1">
         {/* Company name */}
         <div
-          className="mb-2"
+          className="mb-1"
           style={{
             color: "var(--text)",
             fontSize: "14px",
@@ -314,46 +341,24 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
           {bet.companyName}
         </div>
 
-        {/* Company description */}
-        {bet.companyDescription && (
-          <p
-            className="mb-3"
-            style={{
-              color: "var(--text-muted)",
-              lineHeight: "1.5",
-              fontSize: "13px",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {bet.companyDescription}
-          </p>
-        )}
-
-        {/* Rationale */}
+        {/* Description: what they do + why it's a smart play */}
         <p
           style={{
-            color: "var(--text-muted)",
+            color: "#999",
             lineHeight: "1.5",
-            fontSize: "14px",
-            display: "-webkit-box",
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
+            fontSize: "13px",
           }}
         >
-          {bet.rationale}
+          {bet.companyDescription && `${bet.companyDescription} `}{bet.rationale}
         </p>
 
         {/* Footer: Role + Feedback + Time horizon */}
-        <div className="mt-auto pt-3 flex items-center gap-3">
+        <div className="mt-auto pt-2 flex items-center gap-3">
           <span
             className="uppercase px-2 py-0.5 border"
             style={{
-              color: bet.role === "BENEFICIARY" ? "#FF4500" : bet.role === "HEADWIND" ? "#5A5A5A" : "var(--text)",
-              borderColor: bet.role === "BENEFICIARY" ? "#FF4500" : bet.role === "HEADWIND" ? "#5A5A5A" : "var(--text)",
+              color: bet.role === "BENEFICIARY" ? "#FF4500" : bet.role === "HEADWIND" ? "#999" : "var(--text)",
+              borderColor: bet.role === "BENEFICIARY" ? "#FF4500" : bet.role === "HEADWIND" ? "#999" : "var(--text)",
               letterSpacing: "0.08em",
               fontSize: "10px",
             }}
@@ -368,7 +373,7 @@ export default function EquityBetCard({ bet, efs, rank }: EquityBetCardProps) {
           <span
             className="uppercase"
             style={{
-              color: "var(--text-muted)",
+              color: "#999",
               letterSpacing: "0.08em",
               fontSize: "11px",
             }}
