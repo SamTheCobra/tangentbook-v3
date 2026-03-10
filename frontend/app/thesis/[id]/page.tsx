@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   api, ThesisDetail, Effect, EquityBet, StartupOpportunity,
   EquityScoreResult, EFSScore, STSScore, FormulasConfig,
+  ScoringBreakdown,
 } from "@/lib/api";
 import GradientBar from "@/components/GradientBar";
 import CascadeLogo from "@/components/CascadeLogo";
@@ -130,18 +131,36 @@ export default function ThesisTreePage() {
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [expandedBetIds, setExpandedBetIds] = useState<Record<string, string | null>>({});
   const [breakdownMap, setBreakdownMap] = useState<Record<string, THIComponent[]>>({});
+  const [fullBreakdownMap, setFullBreakdownMap] = useState<Record<string, ScoringBreakdown>>({});
   const [formulas, setFormulas] = useState<FormulasConfig | null>(null);
+  const [revealedPanels, setRevealedPanels] = useState<Set<string>>(new Set());
+  const [refreshingFeeds, setRefreshingFeeds] = useState<string | null>(null); // "global" or card id
   const fetchedBreakdowns = useRef<Set<string>>(new Set());
 
-  const reloadThesis = async () => {
-    const [t, efs] = await Promise.all([
-      api.getThesis(id),
+  const fetchAllEfsAndSts = async (t: ThesisDetail) => {
+    // Collect all effect IDs (including nested)
+    const allEffectIds: string[] = [];
+    const collectIds = (effects: Effect[]) => {
+      for (const e of effects) {
+        allEffectIds.push(e.id);
+        if (e.childEffects) collectIds(e.childEffects);
+      }
+    };
+    collectIds(t.effects);
+
+    // Fetch EFS for thesis + all effects in parallel
+    const efsPromises = [
       api.getThesisEquityScores(id).catch(() => [] as EquityScoreResult[]),
-    ]);
-    setThesis(t);
+      ...allEffectIds.map((eid) =>
+        api.getEffectEquityScores(eid).catch(() => [] as EquityScoreResult[])
+      ),
+    ];
+    const efsResults = await Promise.all(efsPromises);
     const newEfs: Record<string, EFSScore> = {};
-    efs.forEach((r) => { if (r.efs) newEfs[r.betId] = r.efs; });
+    efsResults.flat().forEach((r) => { if (r.efs) newEfs[r.betId] = r.efs; });
     setEfsMap(newEfs);
+
+    // Fetch STS for all startups
     const allOpps = [
       ...t.startupOpportunities,
       ...t.effects.flatMap((e) => [
@@ -157,6 +176,12 @@ export default function ThesisTreePage() {
       stsResults.forEach((r) => { if (r?.sts) newSts[r.oppId] = r.sts; });
       setStsMap(newSts);
     }
+  };
+
+  const reloadThesis = async () => {
+    const t = await api.getThesis(id);
+    setThesis(t);
+    await fetchAllEfsAndSts(t);
   };
 
   useEffect(() => {
@@ -177,6 +202,7 @@ export default function ThesisTreePage() {
         };
         api.getScoringBreakdown(id)
           .then((bd) => {
+            setFullBreakdownMap((prev) => ({ ...prev, hero: bd }));
             setBreakdownMap((prev) => ({
               ...prev,
               hero: buildTHIComponents(bd, {
@@ -197,25 +223,7 @@ export default function ThesisTreePage() {
               ],
             }));
           });
-        const efs = await api.getThesisEquityScores(id).catch(() => [] as EquityScoreResult[]);
-        const newEfs: Record<string, EFSScore> = {};
-        efs.forEach((r) => { if (r.efs) newEfs[r.betId] = r.efs; });
-        setEfsMap(newEfs);
-        const allOpps = [
-          ...t.startupOpportunities,
-          ...t.effects.flatMap((e) => [
-            ...e.startupOpportunities,
-            ...e.childEffects.flatMap((c) => c.startupOpportunities),
-          ]),
-        ];
-        if (allOpps.length > 0) {
-          const stsResults = await Promise.all(
-            allOpps.map((o) => api.getStartupSTS(o.id).catch(() => null))
-          );
-          const newSts: Record<string, STSScore> = {};
-          stsResults.forEach((r) => { if (r?.sts) newSts[r.oppId] = r.sts; });
-          setStsMap(newSts);
-        }
+        await fetchAllEfsAndSts(t);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -246,6 +254,7 @@ export default function ThesisTreePage() {
       const stored = effectMap[effectId];
       api.getEffectScoringBreakdown(effectId)
         .then((bd) => {
+          setFullBreakdownMap((prev) => ({ ...prev, [cardId]: bd }));
           setBreakdownMap((prev) => ({
             ...prev,
             [cardId]: buildTHIComponents(bd, {
@@ -327,12 +336,37 @@ export default function ThesisTreePage() {
     }
   };
 
+  const handleRefreshFeeds = async (sourceId: string) => {
+    setRefreshingFeeds(sourceId);
+    try {
+      await api.refreshFeeds(id);
+      fetchedBreakdowns.current.clear();
+      await reloadThesis();
+      // Re-fetch breakdowns for expanded cards
+      setFullBreakdownMap({});
+      setBreakdownMap({});
+    } catch {
+      setRefreshingFeeds("failed");
+      setTimeout(() => setRefreshingFeeds(null), 3000);
+      return;
+    }
+    setRefreshingFeeds(null);
+  };
+
   const togglePill = (cardId: string, panel: string) => {
+    const isOpening = activePanels[cardId] !== panel;
     setActivePanels((prev) => ({
       ...prev,
       [cardId]: prev[cardId] === panel ? null : panel,
     }));
     setExpandedBetIds((prev) => ({ ...prev, [cardId]: null }));
+    // Trigger EFS bar stagger animation when opening plays panel
+    if (isOpening && panel === "plays") {
+      setRevealedPanels((prev) => { const n = new Set(prev); n.delete(cardId); return n; });
+      requestAnimationFrame(() => {
+        setRevealedPanels((prev) => { const n = new Set(prev); n.add(cardId); return n; });
+      });
+    }
   };
 
   const flatNodes = flattenTree(tree);
@@ -363,6 +397,19 @@ export default function ThesisTreePage() {
           </span>
         </a>
         <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          <a
+            href="/methodology"
+            style={{
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "0.75rem", fontWeight: 700,
+              letterSpacing: "0.1em", textTransform: "uppercase",
+              color: "#888", textDecoration: "none",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#888")}
+          >
+            METHODOLOGY
+          </a>
           <span style={{
             fontFamily: "var(--font-mono), monospace", fontSize: "11px",
             color: "#333", letterSpacing: "0.04em",
@@ -383,8 +430,31 @@ export default function ThesisTreePage() {
         </div>
       </div>
 
+      {/* Refresh feeds bar */}
+      <div style={{ padding: "16px 32px 0", maxWidth: "1200px", margin: "0 auto", display: "flex", justifyContent: "flex-end" }}>
+        <button
+          onClick={() => handleRefreshFeeds("global")}
+          disabled={refreshingFeeds !== null}
+          onMouseEnter={(e) => { if (!refreshingFeeds) { e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "#fff"; } }}
+          onMouseLeave={(e) => { if (!refreshingFeeds) { e.currentTarget.style.color = refreshingFeeds === "failed" ? "#FF4500" : "#888"; e.currentTarget.style.borderColor = "#444"; } }}
+          style={{
+            padding: "6px 14px",
+            fontFamily: "var(--font-mono), monospace",
+            fontSize: "0.7rem", fontWeight: 700,
+            letterSpacing: "0.1em", textTransform: "uppercase",
+            border: "1px solid #444",
+            color: refreshingFeeds === "failed" ? "#FF4500" : "#888",
+            background: "transparent",
+            cursor: refreshingFeeds ? "wait" : "pointer",
+            opacity: refreshingFeeds && refreshingFeeds !== "failed" ? 0.5 : 1,
+          }}
+        >
+          {refreshingFeeds === "global" ? "REFRESHING..." : refreshingFeeds === "failed" ? "REFRESH FAILED" : "\u21BB REFRESH FEEDS"}
+        </button>
+      </div>
+
       {/* Tree */}
-      <div style={{ padding: "40px 32px 80px", maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+      <div style={{ padding: "24px 32px 80px", maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "12px" }}>
         {flatNodes.map((node) => {
           const isExpanded = expandedIds.has(node.id);
           const isHovered = hoveredCardId === node.id;
@@ -552,35 +622,16 @@ export default function ThesisTreePage() {
                       <ExpandableText text={node.description} color={ds.mutedColor} />
                     </div>
 
-                    {/* RIGHT COLUMN ~40% — THI gauge + score breakdown */}
-                    <div style={{ flex: "0 0 40%", minWidth: 0, overflowY: "auto", maxHeight: "400px", paddingRight: "8px" }}>
-                      <div style={{ display: "flex", justifyContent: "center" }}>
-                        <THIGauge score={Math.round(node.thiScore)} size={160} />
+                    {/* RIGHT COLUMN ~40% — THI gauge + breakdown */}
+                    <div style={{ flex: "0 0 40%", minWidth: 0 }}>
+                      <div style={{ display: "flex", justifyContent: "center", marginBottom: "16px" }}>
+                        <THIGauge score={Math.round(node.thiScore)} size={160} animate />
                       </div>
-
-                      {/* Score breakdown — always visible for all cards */}
-                      {nodeBreakdown && nodeBreakdown.length > 0 && (
-                        <div style={{ marginTop: "16px" }}>
-                          {nodeBreakdown.map((c) => (
-                            <BreakdownRow
-                              key={c.label}
-                              label={c.label}
-                              score={c.score}
-                              weight={c.weight}
-                            />
-                          ))}
-                          {/* THI formula */}
-                          <div style={{
-                            fontFamily: "var(--font-mono), monospace",
-                            fontSize: "9px", color: "#444",
-                            marginTop: "10px", lineHeight: "1.5",
-                          }}>
-                            THI = {nodeBreakdown.map((c) =>
-                              `(${Math.round(c.score)}×${c.weight.toFixed(2)})`
-                            ).join(" + ")} = {Math.round(node.thiScore)}
-                          </div>
-                        </div>
-                      )}
+                      <THIBreakdownPanel
+                        bd={fullBreakdownMap[node.id] || null}
+                        thiScore={Math.round(node.thiScore)}
+                        nodeBreakdown={nodeBreakdown}
+                      />
                     </div>
                   </div>
 
@@ -603,6 +654,26 @@ export default function ThesisTreePage() {
                         onClick={() => togglePill(node.id, "effects")}
                       />
                     )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRefreshFeeds(node.id); }}
+                      disabled={refreshingFeeds !== null}
+                      onMouseEnter={(e) => { if (!refreshingFeeds) { e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "#fff"; } }}
+                      onMouseLeave={(e) => { if (!refreshingFeeds) { e.currentTarget.style.color = refreshingFeeds === "failed" ? "#FF4500" : "#888"; e.currentTarget.style.borderColor = "#444"; } }}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: "4px",
+                        padding: "6px 14px",
+                        fontFamily: "var(--font-mono), monospace",
+                        fontSize: "0.7rem", fontWeight: 700,
+                        letterSpacing: "0.1em", textTransform: "uppercase",
+                        border: "1px solid #444",
+                        color: refreshingFeeds === "failed" ? "#FF4500" : "#888",
+                        background: "transparent",
+                        cursor: refreshingFeeds ? "wait" : "pointer",
+                        opacity: refreshingFeeds && refreshingFeeds !== "failed" ? 0.5 : 1,
+                      }}
+                    >
+                      {refreshingFeeds === node.id ? "REFRESHING..." : refreshingFeeds === "failed" ? "REFRESH FAILED" : "\u21BB REFRESH FEEDS"}
+                    </button>
                   </div>
 
                   {/* ── PANEL: Stocks & Startups ── */}
@@ -637,9 +708,10 @@ export default function ThesisTreePage() {
                       {/* Stocks */}
                       {cardPlaysTab === "stocks" && (
                         <div style={{ maxHeight: "500px", overflowY: "auto" }}>
-                          {node.equityBets.map((bet) => {
+                          {node.equityBets.map((bet, betIdx) => {
                             const efs = efsMap[bet.id];
                             const isBetExpanded = cardExpandedBet === bet.id;
+                            const barsRevealed = revealedPanels.has(node.id);
                             return (
                               <div key={bet.id} style={{
                                 marginBottom: "12px", paddingBottom: "12px",
@@ -697,7 +769,7 @@ export default function ThesisTreePage() {
                                     {bet.rationale}
                                   </div>
                                   {efs && (
-                                    <GradientBar value={efs.efsScore} height={4} />
+                                    <GradientBar value={efs.efsScore} height={4} animate={barsRevealed} delay={betIdx * 80} />
                                   )}
                                 </div>
 
@@ -931,9 +1003,11 @@ function flattenRec(node: CardNode, result: CardNode[]) {
 
 // ─── THI Gauge — Canvas, matching original Needle gradient ───────────────────
 
-function THIGauge({ score, size = 160 }: { score: number; size?: number }) {
+function THIGauge({ score, size = 160, animate }: { score: number; size?: number; animate?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const displayScore = useRef(0);
   const height = Math.round(size * 0.65);
+  const [displayNum, setDisplayNum] = useState(animate ? 0 : score);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -943,74 +1017,105 @@ function THIGauge({ score, size = 160 }: { score: number; size?: number }) {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = size * dpr;
     canvas.height = height * dpr;
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, size, height);
 
     const cx = size / 2;
     const cy = height - 4;
     const radius = size / 2 - 8;
-    const s = Math.max(0, Math.min(100, score));
-    const needleAngle = Math.PI + (s / 100) * Math.PI;
-    const nx = cx + radius * Math.cos(needleAngle);
-    const ny = cy + radius * Math.sin(needleAngle);
 
-    // WEDGE — cubic ease-in orange gradient (exact values from Needle.tsx)
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, radius - 4, Math.PI, needleAngle, false);
-    ctx.closePath();
-    const grad = ctx.createLinearGradient(cx - radius, 0, cx + radius, 0);
-    const maxOpacity = 0.65;
-    const fullAt = 0.72;
-    for (let i = 0; i <= 100; i++) {
-      const t = i / 100;
-      const eased = t < fullAt ? Math.pow(t / fullAt, 3) * maxOpacity : maxOpacity;
-      grad.addColorStop(t, `rgba(255,69,0,${eased.toFixed(4)})`);
-    }
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.restore();
+    const drawGauge = (s: number) => {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, size, height);
+      const clamped = Math.max(0, Math.min(100, s));
+      const needleAngle = Math.PI + (clamped / 100) * Math.PI;
+      const nx = cx + radius * Math.cos(needleAngle);
+      const ny = cy + radius * Math.sin(needleAngle);
 
-    // ARC OUTLINE
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI, false);
-    ctx.strokeStyle = "rgba(255,255,255,0.13)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // TICK MARKS at 0, 50, 100
-    [0, 50, 100].forEach(v => {
-      const a = Math.PI + (v / 100) * Math.PI;
+      // WEDGE
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(cx + (radius - 8) * Math.cos(a), cy + (radius - 8) * Math.sin(a));
-      ctx.lineTo(cx + (radius + 3) * Math.cos(a), cy + (radius + 3) * Math.sin(a));
-      ctx.strokeStyle = "rgba(255,255,255,0.22)";
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius - 4, Math.PI, needleAngle, false);
+      ctx.closePath();
+      const grad = ctx.createLinearGradient(cx - radius, 0, cx + radius, 0);
+      const maxOpacity = 0.65;
+      const fullAt = 0.72;
+      for (let i = 0; i <= 100; i++) {
+        const t = i / 100;
+        const eased = t < fullAt ? Math.pow(t / fullAt, 3) * maxOpacity : maxOpacity;
+        grad.addColorStop(t, `rgba(255,69,0,${eased.toFixed(4)})`);
+      }
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+
+      // ARC OUTLINE
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI, false);
+      ctx.strokeStyle = "rgba(255,255,255,0.13)";
       ctx.lineWidth = 1;
       ctx.stroke();
-    });
 
-    // NEEDLE LINE
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(nx, ny);
-    ctx.strokeStyle = "#FF4500";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.stroke();
+      // TICK MARKS
+      [0, 50, 100].forEach(v => {
+        const a = Math.PI + (v / 100) * Math.PI;
+        ctx.beginPath();
+        ctx.moveTo(cx + (radius - 8) * Math.cos(a), cy + (radius - 8) * Math.sin(a));
+        ctx.lineTo(cx + (radius + 3) * Math.cos(a), cy + (radius + 3) * Math.sin(a));
+        ctx.strokeStyle = "rgba(255,255,255,0.22)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
 
-    // PIVOT DOT
-    ctx.beginPath();
-    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-    ctx.fillStyle = "#FF4500";
-    ctx.fill();
+      // NEEDLE
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(nx, ny);
+      ctx.strokeStyle = "#FF4500";
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.stroke();
 
-    // TIP DOT
-    ctx.beginPath();
-    ctx.arc(nx, ny, 3, 0, Math.PI * 2);
-    ctx.fillStyle = "#FF4500";
-    ctx.fill();
-  }, [score, size, height]);
+      // PIVOT DOT
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "#FF4500";
+      ctx.fill();
+
+      // TIP DOT
+      ctx.beginPath();
+      ctx.arc(nx, ny, 3, 0, Math.PI * 2);
+      ctx.fillStyle = "#FF4500";
+      ctx.fill();
+    };
+
+    if (!animate) {
+      drawGauge(score);
+      setDisplayNum(score);
+      return;
+    }
+
+    // Animate from current displayScore to target over 1.2s ease-out
+    const from = displayScore.current;
+    const to = score;
+    const duration = 1200;
+    let startTime: number | null = null;
+    let rafId: number;
+
+    const step = (ts: number) => {
+      if (!startTime) startTime = ts;
+      const elapsed = ts - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // cubic ease-out
+      const current = from + (to - from) * eased;
+      drawGauge(current);
+      displayScore.current = current;
+      setDisplayNum(Math.round(current));
+      if (progress < 1) rafId = requestAnimationFrame(step);
+    };
+    rafId = requestAnimationFrame(step);
+
+    return () => cancelAnimationFrame(rafId);
+  }, [score, size, height, animate]);
 
   return (
     <div style={{ textAlign: "center" }}>
@@ -1025,8 +1130,142 @@ function THIGauge({ score, size = 160 }: { score: number; size?: number }) {
         color: "#FF4500",
         marginTop: "2px",
       }}>
-        {score}
+        {displayNum}
       </div>
+    </div>
+  );
+}
+
+// ─── THI Breakdown Panel — Three-Column Layout ──────────────────────────────
+
+function THIBreakdownPanel({ bd, thiScore, nodeBreakdown }: {
+  bd: ScoringBreakdown | null;
+  thiScore: number;
+  nodeBreakdown?: THIComponent[];
+}) {
+  // Use full breakdown if available, fall back to nodeBreakdown
+  const rows = bd
+    ? [
+        { label: "EVIDENCE", weight: 0.50, score: bd.thiFormula.evidenceScore, detail: nodeBreakdown?.find((r) => r.label === "EVIDENCE")?.detail },
+        { label: "MOMENTUM", weight: 0.30, score: bd.thiFormula.momentumScore, detail: nodeBreakdown?.find((r) => r.label === "MOMENTUM")?.detail },
+        { label: "DATA QUALITY", weight: 0.20, score: bd.thiFormula.qualityScore, detail: nodeBreakdown?.find((r) => r.label === "CONVICTION")?.detail },
+      ]
+    : nodeBreakdown
+      ? nodeBreakdown.map((r) => ({
+          label: r.label === "CONVICTION" ? "DATA QUALITY" : r.label,
+          weight: r.weight,
+          score: r.score,
+          detail: r.detail,
+        }))
+      : null;
+
+  if (!rows) return null;
+
+  // Detect momentum no-history state
+  const momRow = rows.find((r) => r.label === "MOMENTUM");
+  const momNoHistory = bd
+    ? (!bd.momentum.hasEnoughHistory ||
+       bd.thiFormula.momentumScore === 0 ||
+       (bd.momentum.thirtyDay.delta === bd.momentum.ninetyDay.delta &&
+        bd.momentum.ninetyDay.delta === bd.momentum.oneYear.delta))
+    : (momRow?.score === 0);
+
+  // Evidence sub-dimensions (only if bd available and feeds exist)
+  const evidenceDims = bd ? [
+    { key: "flow" as const, label: "FLOW", weight: 0.35 },
+    { key: "structural" as const, label: "STRUCTURAL", weight: 0.30 },
+    { key: "adoption" as const, label: "ADOPTION", weight: 0.20 },
+    { key: "policy" as const, label: "POLICY", weight: 0.15 },
+  ].filter((d) => bd.evidence[d.key].feeds.length > 0) : [];
+
+  return (
+    <div>
+      {rows.map((row) => (
+        <div key={row.label} style={{ marginBottom: "12px" }}>
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            marginBottom: "4px",
+          }}>
+            <span style={{
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "0.7rem", letterSpacing: "0.08em",
+              textTransform: "uppercase" as const,
+              color: "#888",
+            }}>
+              {row.label} <span style={{ color: "#555" }}>{Math.round(row.weight * 100)}%</span>
+            </span>
+            <span style={{
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "1rem", fontWeight: 700,
+              color: "#FF4500",
+            }}>
+              {Math.round(row.score)}
+            </span>
+          </div>
+          <GradientBar value={row.score} height={3} />
+          {row.label === "MOMENTUM" && momNoHistory ? (
+            <div style={{
+              fontFamily: "var(--font-inter), sans-serif",
+              fontSize: "0.7rem", color: "#555", fontStyle: "italic",
+              marginTop: "4px", lineHeight: 1.5,
+            }}>
+              Builds after first feed refresh
+            </div>
+          ) : row.detail ? (
+            <div style={{
+              fontFamily: "var(--font-inter), sans-serif",
+              fontSize: "0.7rem", color: "#666",
+              fontStyle: "italic", marginTop: "4px", lineHeight: 1.4,
+            }}>
+              {row.detail}
+            </div>
+          ) : null}
+
+          {/* Evidence sub-dimensions inline */}
+          {row.label === "EVIDENCE" && evidenceDims.length > 0 && (
+            <div style={{ marginTop: "8px", paddingLeft: "8px", borderLeft: "1px solid #1a1a1a" }}>
+              {evidenceDims.map((d) => {
+                const dim = bd!.evidence[d.key];
+                return (
+                  <div key={d.key} style={{ marginBottom: "6px" }}>
+                    <div style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      marginBottom: "2px",
+                    }}>
+                      <span style={{
+                        fontFamily: "var(--font-mono), monospace",
+                        fontSize: "8px", letterSpacing: "0.06em",
+                        textTransform: "uppercase" as const, color: "#444",
+                      }}>
+                        {d.label} ({Math.round(d.weight * 100)}%)
+                      </span>
+                      <span style={{
+                        fontFamily: "var(--font-mono), monospace",
+                        fontSize: "10px", fontWeight: 700, color: "#FF4500",
+                      }}>
+                        {dim.score != null ? Math.round(dim.score) : "—"}
+                      </span>
+                    </div>
+                    <GradientBar value={dim.score ?? 0} height={2} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Formula row */}
+      {bd && (
+        <div style={{
+          borderTop: "1px solid #1a1a1a",
+          paddingTop: "8px", marginTop: "4px",
+          fontFamily: "var(--font-mono), monospace",
+          fontSize: "8px", color: "#444", lineHeight: 1.5,
+        }}>
+          THI = ({Math.round(bd.thiFormula.evidenceScore)}&times;.50) + ({Math.round(bd.thiFormula.momentumScore)}&times;.30) + ({Math.round(bd.thiFormula.qualityScore)}&times;.20) = <span style={{ color: "#FF4500", fontWeight: 700 }}>{thiScore}</span>
+        </div>
+      )}
     </div>
   );
 }

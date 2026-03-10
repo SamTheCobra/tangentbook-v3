@@ -1,8 +1,65 @@
-# Macro Dashboard v2 — Project Handoff
+# CASCADE — Progress & Handoff Document
 
-## Context-Setter (paste at top of new chat)
+**Date:** 2026-03-10
 
-> I'm working on macro-dashboard-v2, a personal macro investing tool. It's a React + FastAPI app where you input investment theses (e.g., "Aging boomers will drive healthcare demand"), Claude AI generates a causal tree (thesis → 2nd order → 3rd order effects with tickers and startup ideas at each level), and then you track evidence via Google Trends, news sentiment, conviction sliders, and health scores. The repo is at ~/macro-dashboard-v2. Please read HANDOFF.md for full project context before we begin.
+---
+
+## Project Overview
+
+CASCADE is a macro investing tool that lets users enter investment theses as plain English sentences, then automatically generates:
+
+1. **Second and third order causal effects** (via Claude AI)
+2. **Data-driven health scores** (THI — Thesis Health Index) from public economic data
+3. **Equity positions** with fit scores (EFS) measuring how purely each stock expresses the thesis
+4. **Startup opportunities** with timing scores (STS)
+
+The core idea: you write "The US dollar is being debased" and CASCADE generates downstream effects ("gold prices rise", "Bitcoin adoption accelerates"), assigns real FRED/Google Trends data feeds to each, computes a 0–100 health score, and suggests non-obvious equity plays ranked by thesis fit.
+
+Built for macro investors who want structured, data-backed conviction tracking — not a stock screener or trading signal.
+
+---
+
+## Current State
+
+### Working
+
+- Full thesis CRUD (create, read, update, delete, archive, reorder)
+- Claude-powered thesis generation from single sentence input
+- Claude-powered 2nd/3rd order effect generation
+- Cascading tree layout with depth-indented cards that expand/collapse independently
+- THI scoring pipeline: FRED feeds fetch → percentile normalization → evidence/momentum/data quality → composite score
+- Google Trends integration for adoption feeds
+- EFS scoring: Yahoo Finance fundamentals + SEC EDGAR segments + price history correlation
+- STS scoring for startup opportunities
+- Macro header (FFR, 10Y-2Y spread, VIX) from FRED
+- Dashboard with filter (all/active/archived), sort (THI/recent/alpha), tag filtering
+- Canvas-based THI gauge with animated needle sweep
+- Canvas-based gradient progress bars with staggered animation
+- Equity bet cards with EFS breakdown, expandable sub-scores, role badges — on both hero and effect cards
+- Startup cards with STS scores and timing labels
+- Per-card refresh feeds button + global refresh button on thesis tree page
+- THI breakdown panel (evidence/momentum/data quality) with formula row
+- Methodology page explaining all scoring formulas
+- Portfolio position tracking with P&L
+- Conviction slider with divergence warnings
+- 16 seeded theses with effects, equity bets, and startup opportunities
+
+### Partially Working
+
+- **Momentum scoring**: Formula is correct but shows 0/neutral for all theses because there are only 1-2 THI snapshots in history. Needs multiple feed refresh cycles over days/weeks to build meaningful deltas. The UI gracefully shows "Builds after first feed refresh" when no history exists.
+- **EFS Revenue Alignment**: Uses keyword matching + hardcoded ticker overrides rather than actual SEC 10-K segment parsing. The SEC EDGAR integration fetches SIC codes and estimates segment count but doesn't parse actual revenue breakdowns.
+- **EFS Thesis Beta**: Requires 6+ THI snapshots to compute meaningful correlation. Returns 0.5 (neutral) with insufficient data.
+- **Data quality scoring**: Backend computes it correctly, but the freshness score display on frontend was overridden to compute `live/total*100` locally because the backend value seemed wrong (showed 20 when 1/1 feeds were live).
+
+### Broken / Missing
+
+- **Backend won't start with current schema changes**: The `evidence_explanation`, `momentum_explanation`, and `conviction_explanation` columns were added to models.py but the SQLite DB needs manual ALTER TABLE statements. If the DB file is deleted, it recreates cleanly on startup via `create_all()`.
+- **No database migrations**: Using SQLAlchemy `create_all()` only. Schema changes require manual `ALTER TABLE` or deleting the DB. No Alembic.
+- **APScheduler not wired**: The scheduler is imported in main.py but feed refresh is only triggered manually (via button or after generation). No automatic periodic refresh.
+- **Several component files are unused legacy**: `Header.tsx`, `EffectChain.tsx`, `NewThesisPanel.tsx`, `ThemeToggle.tsx` are from earlier iterations and may not be used by current pages.
+- **Effect detail page is just a redirect**: `/thesis/[id]/effect/[effectId]` redirects back to the thesis page, doesn't have its own view.
+- **No authentication or multi-user support**
+- **No error toasts/notifications**: Errors are console.error'd or briefly shown in button labels
 
 ---
 
@@ -10,253 +67,518 @@
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Frontend | React + Vite | React 19.2, Vite 7.3 |
-| Routing | react-router-dom | 7.13 |
-| Styling | Tailwind CSS 4.2 + CSS variables + inline styles | — |
-| Icons | lucide-react | 0.576 |
-| HTTP | axios | 1.13 |
-| Backend | FastAPI + Uvicorn | FastAPI 0.115, Uvicorn 0.34 |
-| ORM | SQLAlchemy 2.0 | SQLite default |
-| AI | Anthropic Claude Sonnet 4 | anthropic 0.42 |
-| Market Data | yfinance 0.2.51 | — |
-| Trends | pytrends 4.9.2 | — |
-| News | NewsAPI (REST) | via requests |
-| Macro Data | FRED API | via requests |
-
-**No TypeScript. No test suite. No Alembic** — migrations are manual ALTER TABLEs in `database.py`.
-
----
-
-## File Tree
-
-```
-macro-dashboard-v2/
-├── .env / .env.example          # ANTHROPIC_API_KEY, FRED_API_KEY, NEWS_API_KEY
-├── Makefile                     # `make start` runs both servers
-├── run.sh                       # Alternative setup script
-├── macro_dashboard_v2.db        # SQLite database (gitignored)
-│
-├── backend/
-│   ├── main.py                  # FastAPI app, CORS, router registration, seed data
-│   ├── database.py              # SQLAlchemy engine, SessionLocal, init_db(), manual migrations
-│   ├── models.py                # 10 SQLAlchemy models
-│   ├── schemas.py               # Pydantic request/response models
-│   ├── requirements.txt
-│   │
-│   ├── routers/
-│   │   ├── theses.py            # CRUD for theses (GET/POST/PUT/DELETE /api/theses)
-│   │   ├── tree.py              # Tree structure + node conviction + regenerate
-│   │   ├── conviction.py        # Conviction time-series entries
-│   │   ├── evidence.py          # Google Trends evidence refresh
-│   │   ├── news.py              # NewsAPI fetch + AI classification
-│   │   ├── bets.py              # Position tracking with PnL
-│   │   └── macro.py             # FRED-based macro regime detection
-│   │
-│   ├── services/
-│   │   ├── ai_service.py        # Claude: tree generation + headline classification
-│   │   ├── scoring_service.py   # Health score = f(conviction, evidence, news)
-│   │   ├── score_cache.py       # Thread-safe in-memory score cache
-│   │   ├── trends_service.py    # Google Trends → evidence score (1-10)
-│   │   ├── news_service.py      # NewsAPI + AI classification → news pulse
-│   │   ├── market_service.py    # yfinance with caching + rate limiting
-│   │   └── fred_service.py      # FRED API for macro regime
-│   │
-│   └── seed/
-│       └── theses_seed.json     # Empty (was pre-populated, user cleared it)
-│
-└── frontend/
-    ├── package.json
-    ├── vite.config.js           # Port 5174, proxy /api → localhost:8000
-    ├── index.html
-    │
-    └── src/
-        ├── main.jsx             # React entry point
-        ├── App.jsx              # BrowserRouter: / → Dashboard, /thesis/:id → ThesisDetail
-        ├── index.css            # CSS variables (dark/light themes), fonts, slider styles
-        │
-        ├── contexts/
-        │   └── ThemeContext.jsx  # Dark/light theme toggle (localStorage persisted)
-        │
-        ├── pages/
-        │   ├── Dashboard.jsx    # Thesis list + new thesis modal + hero branding
-        │   └── ThesisDetail.jsx # Fetches thesis + tree, renders TreeView + tabs
-        │
-        ├── components/
-        │   ├── Layout.jsx       # App shell: header nav + theme toggle + Outlet
-        │   ├── TreeView.jsx     # *** MAIN COMPONENT (1350+ lines) *** — see below
-        │   ├── ThesisCard.jsx   # Dashboard card with health ring + badges
-        │   ├── NewThesisModal.jsx # Modal for creating new thesis
-        │   ├── HealthGauge.jsx  # SVG circular progress ring
-        │   ├── EvidenceChart.jsx # Evidence metrics grid + breakdown tooltip
-        │   ├── ConvictionLog.jsx # Conviction history list
-        │   ├── NewsPulse.jsx    # News headlines with classification badges
-        │   ├── BetsTracker.jsx  # Position entry/tracking table
-        │   ├── HealthTab.jsx    # Tab container for Evidence/Conviction/News/Bets
-        │   └── NodePanel.jsx    # (unused/minimal)
-        │
-        └── utils/
-            └── api.js           # axios wrapper: all API endpoints
-```
+| Frontend | Next.js (App Router) | 14.2.35 |
+| Frontend | React | ^18 |
+| Frontend | TypeScript | ^5 |
+| Frontend | Tailwind CSS | ^3.4.1 |
+| Frontend | Recharts | ^3.7.0 |
+| Backend | FastAPI | 0.115.6 |
+| Backend | Python | 3.11 |
+| Backend | SQLAlchemy | 2.0.36 |
+| Backend | Anthropic SDK | 0.40.0 |
+| Database | SQLite | (via SQLAlchemy) |
+| Data | FRED API | fredapi via httpx |
+| Data | Google Trends | pytrends 4.9.2 |
+| Data | Yahoo Finance | yfinance (via pip, not in requirements.txt) |
+| Data | SEC EDGAR | Direct httpx calls |
+| Scheduler | APScheduler | 3.10.4 (imported, not actively scheduling) |
+| Fonts | Bricolage Grotesque 800, Inter, JetBrains Mono | Google Fonts |
 
 ---
 
-## Architecture & Data Flow
+## File Structure
 
-### Core Loop
+### Backend (`backend/`)
+
 ```
-User enters thesis title
-  → Claude AI generates causal tree (3 × 2nd-order, each with 3 × 3rd-order)
-  → Each node gets: tickers (with rationale + direction), startup ideas, sector ETF
-  → User adjusts conviction sliders at every tree level
-  → Evidence refreshed via Google Trends (keyword momentum, breadth, recency)
-  → News fetched via NewsAPI, classified by Claude (confirming/neutral/contradicting)
-  → Health Score = (weighted conviction × 0.4 + evidence × 0.6) × 10
+backend/
+├── main.py                    — FastAPI app, CORS, lifespan startup (create tables + seed), router registration
+├── config.py                  — Env vars (FRED_API_KEY, ANTHROPIC_API_KEY, etc.), loads formulas.json
+├── database.py                — SQLAlchemy engine + SessionLocal for SQLite (tangentbook.db)
+├── models.py                  — All SQLAlchemy models (15 tables)
+├── seed.py                    — Seeds 16 theses with effects, bets, opportunities, feeds (~960 lines)
+├── requirements.txt           — Python dependencies
+├── routers/
+│   ├── theses.py              — Thesis/Effect/Bet/Opportunity CRUD + conviction + formulas endpoint
+│   ├── feeds.py               — Feed listing, refresh, scoring breakdown, macro header
+│   ├── efs.py                 — EFS and STS score retrieval and refresh
+│   ├── generate.py            — Claude AI thesis + effect generation
+│   └── portfolio.py           — Portfolio position CRUD and P&L
+├── services/
+│   ├── scoring_engine.py      — THI math: evidence, momentum, conviction, child THI
+│   ├── feed_refresh.py        — Orchestrates feed fetch → normalize → score → snapshot
+│   ├── efs_service.py         — EFS/STS calculation with Yahoo/SEC/Crunchbase
+│   ├── fred_client.py         — FRED API client (fetch series, macro header data)
+│   └── gtrends_client.py      — Google Trends client (pytrends wrapper)
+├── clean_bet_descriptions.py  — One-off script to clean bet descriptions
+├── regenerate_descriptions.py — One-off script to regenerate descriptions
+├── dedup_tickers.py           — One-off script to deduplicate tickers
+├── fix_effect_thi_scores.py   — One-off script to fix effect THI scores
+├── fix_names_and_descriptions.py — One-off script to fix names
+├── refresh_all.py             — Standalone script to trigger full refresh
+├── seed_9bets.py              — One-off script to seed 9 bets per node
+├── seed_effect_feeds.py       — One-off script to seed feeds for effects
+├── seed_gaps.py               — One-off gap-filling seed script
+├── seed_gaps2.py              — One-off gap-filling seed script
+└── seed_gaps3.py              — One-off gap-filling seed script
 ```
 
-### Scoring Pipeline
+### Frontend (`frontend/`)
+
 ```
-Health Score (0-100) = (conviction × 0.4 + evidence × 0.6) × 10
-
-Conviction (0-10) = weighted average:
-  - Root slider:    40%
-  - 2nd-order avg:  35%
-  - 3rd-order avg:  25%
-
-Evidence (0-10) = Google Trends composite:
-  - Trend momentum:  50%  (last 3mo vs previous 9mo)
-  - Keyword breadth:  30%  (% of keywords growing >20%)
-  - Recency bonus:    20%  (last 4wk vs previous 4wk)
-
-News Pulse (0-10) = confirming / (confirming + contradicting) × 10 over 30 days
+frontend/
+├── app/
+│   ├── layout.tsx                           — Root layout: Inter + JetBrains Mono fonts, Bricolage Grotesque via CDN
+│   ├── globals.css                          — CSS vars, dark theme defaults
+│   ├── page.tsx                             — Dashboard: thesis cards, macro header, filter/sort/tags, new thesis input
+│   ├── methodology/
+│   │   └── page.tsx                         — Static methodology page explaining all scoring formulas
+│   └── thesis/
+│       └── [id]/
+│           ├── page.tsx                     — Thesis tree: cascading cards, THI gauge, breakdown, EFS, refresh
+│           └── effect/
+│               └── [effectId]/
+│                   └── page.tsx             — Redirect to parent thesis page
+├── components/
+│   ├── CascadeLogo.tsx                      — SVG logo: cascading bars + wordmark
+│   ├── ConvictionSlider.tsx                 — 1-10 slider with note field and divergence warning
+│   ├── EffectChain.tsx                      — Legacy: vertical accordion effect chain (not used in current tree)
+│   ├── EquityBetCard.tsx                    — Equity bet card with EFS bar, role badge, expandable breakdown
+│   ├── ErrorBoundary.tsx                    — React error boundary with fallback UI
+│   ├── GradientBar.tsx                      — Canvas progress bar with orange gradient, animation support
+│   ├── Header.tsx                           — Legacy: app header (dashboard has its own inline header now)
+│   ├── Needle.tsx                           — Canvas semicircular gauge (sm/md/lg), used on dashboard cards
+│   ├── NewThesisPanel.tsx                   — Legacy: slide-down thesis creation panel
+│   ├── Skeleton.tsx                         — Loading skeleton placeholders
+│   ├── Sparkline.tsx                        — Recharts mini line chart for data series
+│   ├── StartupCard.tsx                      — Startup opportunity card with STS score
+│   ├── StockSparkline.tsx                   — Stock price sparkline via Recharts
+│   ├── ThemeToggle.tsx                      — Legacy: dark/light theme toggle
+│   └── TrashIcon.tsx                        — SVG trash icon
+├── lib/
+│   └── api.ts                               — API client + all TypeScript interfaces (465 lines)
+├── package.json
+├── tailwind.config.ts
+├── tsconfig.json
+└── next.config.mjs
 ```
 
-### Key Architectural Decisions
-1. **SQLite, no Alembic** — Single-user app. Migrations via `_migrate_add_columns()` in `database.py`. Any new column needs an ALTER TABLE there.
-2. **No background workers** — Evidence refresh is synchronous per-thesis (with rate limiting). Bulk refresh is a FastAPI BackgroundTask.
-3. **In-memory score cache** — `score_cache.py` is a simple dict, not Redis. Fine for single-process.
-4. **Inline styles everywhere** — Frontend uses CSS variables + inline style objects. No CSS modules, no styled-components. This is intentional.
-5. **TreeView.jsx is the god component** — 1350+ lines. Contains HeroCard, SecondOrderCard, ThirdOrderCard, TickerChart, ConvictionSlider, HealthRing, StickyHeroBar, TickersList, IdeasList, and all conviction/health state management. Not decomposed into separate files on purpose — it's one interconnected tree.
-6. **Mock data for sparklines** — `TickerChart` uses `mockSparkline()` with seeded randomness, NOT real price data. The sparklines are cosmetic. Real price data is only used in BetsTracker.
-7. **Claude Sonnet 4 for generation** — Model: `claude-sonnet-4-20250514`. Tree generation prompt is ~150 lines of detailed instructions for tone, specificity, and format.
+### Project Root
 
----
-
-## Current State (What Works)
-
-- **Thesis creation** — Enter title → Claude generates full causal tree → stored in DB
-- **Tree visualization** — HeroCard (root) → 2nd order cards (3-column grid) → 3rd order cards (nested under each)
-- **Conviction sliders** — At every tree level. Root saves to ConvictionEntry; child nodes save to TreeNode.user_conviction. All feed into weighted health score.
-- **Evidence refresh** — Click refresh → calls Google Trends for thesis keywords → computes score → stores breakdown for tooltip
-- **Evidence tooltip** — Hover over Evidence score → shows keywords searched, momentum, breadth, recent headlines
-- **News fetch + classification** — NewsAPI → Claude classifies each headline → news pulse score
-- **Health score** — Computed on backend, displayed as animated SVG ring with tooltip breakdown
-- **Inline title editing** — Click pencil on thesis title → edit in-place → saves via PUT
-- **Bets tracker** — CRUD for positions with PnL calculation
-- **Macro regime** — FRED data → determines Risk-On/Off, Tightening, Easing, etc.
-- **Dark/light theme** — Full CSS variable system, toggle in header
-- **Sticky hero bar** — Scrolls past hero → collapsed bar appears with health ring + tickers
-- **Ticker links** — All ticker symbols link to Yahoo Finance in new tab
-- **Delete thesis** — Trash icon on hero card
-
----
-
-## Known Bugs & Limitations
-
-1. **Sparklines are fake** — `TickerChart` uses seeded random data, not real price history. `mockSparkline()` generates cosmetic lines. Real yfinance data is only used in bets PnL.
-2. **Ticker name lookup is a hardcoded map** — `getTickerName()` in TreeView.jsx has ~30 entries. Unknown tickers show no name.
-3. **Sector ETF inference is keyword-matching** — `inferSectorETF()` uses string matching on labels/descriptions. Often wrong.
-4. **Google Trends rate limiting** — pytrends gets 429'd frequently. 60s retry backoff, max 3 attempts. Bulk refresh has 10s delays between theses.
-5. **NewsAPI free tier** — Limited to 100 requests/day, headlines only from last 30 days.
-6. **No authentication** — Single-user app, no auth layer.
-7. **No tests** — Zero test files exist.
-8. **SQLite create_all won't add columns** — Must manually add ALTER TABLE to `_migrate_add_columns()` for any new column.
-9. **ConvictionEntry is append-only** — PUT conviction creates a new entry (doesn't update). Score reads latest by date.
-10. **Evidence breakdown is null until first refresh** — Tooltip shows nothing until user clicks refresh.
-11. **Tree regeneration loses conviction data** — Regenerating the tree deletes all TreeNodes, including user_conviction values.
-
----
-
-## Gotchas & Tricky Details
-
-- **Vite proxy**: Frontend runs on `:5174`, proxies `/api` to backend on `:8000`. Change both in `vite.config.js` and the Makefile if you move ports.
-- **CORS**: Backend allows `localhost:5173` and `localhost:5174` in `main.py`. Add new origins there if needed.
-- **JSON cleaning**: `_clean_json_response()` in ai_service.py strips markdown fences and trailing commas. Claude sometimes wraps JSON in ```json blocks.
-- **Font stack**: Space Grotesk (sans) + JetBrains Mono (mono), loaded via Google Fonts CDN in index.css.
-- **CSS variable system**: ~45 variables per theme. All components reference them via `var(--color-*)`. The complete list is in `index.css`.
-- **Health score recalculation**: After conviction change, frontend calls `putConviction()` then re-fetches thesis to get updated health score from backend. There's a 200ms debounce + 500ms API delay.
-- **evidence_breakdown column**: JSON column on Thesis model. Stores `{keywords_queried, trend_momentum, keyword_breadth, recency_bonus, recent_headlines}`. Added via migration in database.py.
-- **TreeView state management**: All conviction state lives in `TreeView` via `useState` + `useMemo`. `soConvictions` and `toConvictions` are objects keyed by node ID. Changes debounce 500ms before API call.
-- **StickyHeroBar**: Uses IntersectionObserver on the hero card ref. When hero scrolls out of view, sticky bar fades in at `top: 52px` (below the header).
-
----
-
-## Environment Setup
-
-```bash
-cd ~/macro-dashboard-v2
-
-# Backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r backend/requirements.txt
-
-# Frontend
-cd frontend && npm install && cd ..
-
-# Environment variables
-cp .env.example .env
-# Edit .env with your API keys:
-#   ANTHROPIC_API_KEY  — required for thesis generation
-#   FRED_API_KEY       — required for macro regime
-#   NEWS_API_KEY       — required for news fetch
-
-# Run both servers
-make start
-# Or separately:
-#   make backend   (uvicorn on :8000)
-#   make frontend  (vite on :5174)
+```
+tangentbook-v3/
+├── formulas.json              — Single source of truth for all scoring weights (THI, EFS, STS, macro)
+├── PROGRESS.md                — Session progress notes
+├── HANDOFF.md                 — This file
+└── .gitignore
 ```
 
 ---
 
-## API Endpoints Summary
+## API Endpoints
+
+All endpoints prefixed with `/api`. Base URL: `http://localhost:8000/api`
+
+### Theses Router (`routers/theses.py`)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/theses` | List theses (sorted by health) |
-| POST | `/api/theses` | Create + AI generate tree |
-| GET | `/api/theses/:id` | Single thesis with scores |
-| PUT | `/api/theses/:id` | Update title/status/keywords |
-| DELETE | `/api/theses/:id` | Delete thesis |
-| GET | `/api/theses/:id/tree` | Nested tree structure |
-| GET | `/api/theses/:id/tree/flat` | Flat node list |
-| POST | `/api/theses/:id/tree/regenerate` | Regenerate tree via AI |
-| PUT | `/api/tree-nodes/:id/conviction` | Update node conviction |
-| GET | `/api/theses/:id/conviction` | Conviction history |
-| PUT | `/api/theses/:id/conviction` | Set conviction (appends entry) |
-| GET | `/api/theses/:id/evidence` | Evidence scores + breakdown |
-| POST | `/api/theses/:id/refresh-evidence` | Refresh via Google Trends |
-| POST | `/api/evidence/refresh-all` | Background bulk refresh |
-| GET | `/api/theses/:id/news` | Recent headlines |
-| POST | `/api/theses/:id/news/fetch` | Fetch + classify new headlines |
-| GET | `/api/theses/:id/news/pulse` | News pulse score |
-| GET/POST/PUT/DELETE | `/api/theses/:id/bets` | Position CRUD |
-| GET | `/api/regime/current` | Macro regime |
-| GET | `/api/health` | Health check |
+| GET | `/formulas` | Return full formulas.json (all scoring weights) |
+| GET | `/theses` | List all theses ordered by display_order |
+| POST | `/theses` | Create a new thesis |
+| GET | `/theses/{thesis_id}` | Get thesis detail with THI history and all relations |
+| PUT | `/theses/{thesis_id}` | Update thesis fields |
+| DELETE | `/theses/{thesis_id}` | Delete thesis and all children |
+| PATCH | `/theses/{thesis_id}/archive` | Toggle archived status |
+| PATCH | `/theses/{thesis_id}/collapse` | Toggle collapsed status |
+| PATCH | `/theses/{thesis_id}/reorder` | Update display_order |
+| PUT | `/theses/{thesis_id}/conviction` | Update user conviction score (1-10) |
+| GET | `/theses/{thesis_id}/effects` | List effects for thesis |
+| POST | `/theses/{thesis_id}/effects` | Create new effect |
+| GET | `/effects/{effect_id}` | Get single effect |
+| PUT | `/effects/{effect_id}` | Update effect |
+| DELETE | `/effects/{effect_id}` | Delete effect |
+| PUT | `/effects/{effect_id}/conviction` | Update effect conviction |
+| POST | `/theses/{thesis_id}/bets` | Create equity bet on thesis |
+| POST | `/effects/{effect_id}/bets` | Create equity bet on effect |
+| PUT | `/bets/{bet_id}` | Update equity bet |
+| DELETE | `/bets/{bet_id}` | Delete equity bet |
+| POST | `/theses/{thesis_id}/opportunities` | Create startup opportunity on thesis |
+| POST | `/effects/{effect_id}/opportunities` | Create startup opportunity on effect |
+| PUT | `/opportunities/{opp_id}` | Update startup opportunity |
+| DELETE | `/opportunities/{opp_id}` | Delete startup opportunity |
+
+### Feeds Router (`routers/feeds.py`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/theses/{thesis_id}/feeds` | List feeds for thesis (not effect feeds) |
+| POST | `/theses/{thesis_id}/feeds/refresh` | Refresh all thesis feeds, recompute THI |
+| POST | `/feeds/refresh-all` | Refresh all theses + macro header |
+| POST | `/macro/refresh` | Refresh macro header only |
+| POST | `/feeds/{feed_id}/refresh` | Refresh single feed |
+| GET | `/feeds/{feed_id}/history` | Get feed cache history |
+| GET | `/macro/header` | Get current macro regime/FFR/spread/VIX |
+| GET | `/theses/{thesis_id}/scoring-breakdown` | Full scoring breakdown by evidence dimension |
+| GET | `/effects/{effect_id}/scoring-breakdown` | Scoring breakdown for an effect |
+| POST | `/effects/{effect_id}/feeds/refresh` | Refresh effect feeds |
+
+### EFS Router (`routers/efs.py`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/theses/{thesis_id}/equity-scores` | Get EFS for all thesis equity bets |
+| POST | `/theses/{thesis_id}/equity-scores/refresh` | Recalculate all thesis EFS scores |
+| GET | `/equity-bet/{bet_id}/efs` | Get single bet EFS breakdown |
+| GET | `/startup/{opp_id}/sts` | Get single startup STS |
+| GET | `/effects/{effect_id}/equity-scores` | Get EFS for all effect equity bets |
+
+### Generate Router (`routers/generate.py`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/theses/generate` | Generate full thesis from sentence (Claude AI) |
+| POST | `/theses/{thesis_id}/generate-effects` | Generate 2nd/3rd order effects (Claude AI) |
+
+### Portfolio Router (`routers/portfolio.py`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/theses/{thesis_id}/portfolio` | Get portfolio positions + P&L |
+| POST | `/theses/{thesis_id}/portfolio/positions` | Add position |
+| PUT | `/portfolio/positions/{position_id}` | Update position |
+| DELETE | `/portfolio/positions/{position_id}` | Delete position |
 
 ---
 
-## Code Conventions
+## Frontend Routes
 
-- **Backend**: Python 3.11+, FastAPI with dependency injection, SQLAlchemy 2.0 style queries, Pydantic v2 schemas
-- **Frontend**: Functional components only, hooks (useState/useEffect/useMemo/useCallback/useRef), no class components
-- **Styling**: Inline style objects referencing CSS variables. No className-based styling except for Tailwind utilities in rare spots
-- **State**: Local component state only, no Redux/Zustand. Parent-to-child prop drilling. API calls in useEffect or event handlers
-- **API calls**: All go through `utils/api.js` which creates an axios instance with `/api` baseURL
-- **Naming**: camelCase in JS, snake_case in Python. Component files are PascalCase.jsx
-- **No TypeScript, no PropTypes** — pure JS throughout
-- **Commit messages**: Imperative mood, 1-2 sentence summary, detail in body
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | Dashboard | Thesis card grid, macro header, filter/sort/tags, new thesis input |
+| `/thesis/[id]` | Thesis Tree | Cascading card tree with THI gauges, breakdowns, EFS, refresh |
+| `/thesis/[id]/effect/[effectId]` | Effect Redirect | Redirects to `/thesis/[id]` (no standalone effect page) |
+| `/methodology` | Methodology | Static page explaining THI, EFS, STS formulas and data sources |
 
 ---
 
-## ~5,300 total lines of code across 30 source files.
+## Component Inventory
+
+| Component | File | Description |
+|-----------|------|-------------|
+| CascadeLogo | `CascadeLogo.tsx` | SVG cascading bars mark + "CASCADE" wordmark |
+| ConvictionSlider | `ConvictionSlider.tsx` | 1–10 horizontal slider with optional note, divergence warning |
+| EffectChain | `EffectChain.tsx` | **Legacy** — vertical accordion for effects, replaced by tree layout |
+| EquityBetCard | `EquityBetCard.tsx` | Stock card: ticker, name, role badge, EFS bar, expandable breakdown |
+| ErrorBoundary | `ErrorBoundary.tsx` | React error boundary with fallback |
+| GradientBar | `GradientBar.tsx` | Canvas progress bar — orange cubic ease-in gradient, animation + delay |
+| Header | `Header.tsx` | **Legacy** — standalone header, replaced by inline nav per page |
+| Needle | `Needle.tsx` | Canvas semicircular gauge (sm 80px / md 120px / lg 200px) |
+| NewThesisPanel | `NewThesisPanel.tsx` | **Legacy** — slide panel for thesis creation, may not be used |
+| Skeleton | `Skeleton.tsx` | Loading skeleton lines + `ThesisCardSkeleton` |
+| Sparkline | `Sparkline.tsx` | Recharts mini line chart for generic data series |
+| StartupCard | `StartupCard.tsx` | Startup card: name, one-liner, timing badge, STS score + bar |
+| StockSparkline | `StockSparkline.tsx` | Recharts stock price sparkline by ticker |
+| ThemeToggle | `ThemeToggle.tsx` | **Legacy** — dark/light toggle via localStorage |
+| TrashIcon | `TrashIcon.tsx` | Simple SVG trash icon |
+
+**Inline components** (defined in `thesis/[id]/page.tsx`, not separate files):
+
+- `THIGauge` — Canvas semicircular gauge with animated needle sweep (1.2s ease-out)
+- `THIBreakdownPanel` — Evidence/Momentum/Data Quality rows with gradient bars + formula
+- `BreakdownRow` — Single score row (label + weight + score + bar + detail text)
+- `PillButton` — Toggle pill for panel sections
+- `ExpandableText` — Clamped text with "Read more" toggle
+
+---
+
+## Data Model
+
+### Core Tables
+
+| Table | Purpose |
+|-------|---------|
+| `theses` | Parent investment theses with THI score, direction, trend, component scores/weights, explanation text, user conviction |
+| `effects` | 2nd/3rd order causal effects linked to theses, with own THI, inheritance weight, explanation text |
+| `equity_bets` | Stock positions linked to thesis OR effect (ticker, role, rationale) |
+| `startup_opportunities` | Startup ideas linked to thesis OR effect (name, one-liner, timing) |
+| `data_feeds` | FRED/Google Trends feeds linked to thesis OR effect (series_id, keyword, normalized_score, weight, status) |
+
+### Scoring Tables
+
+| Table | Purpose |
+|-------|---------|
+| `equity_fit_scores` | EFS per equity bet (5 sub-scores + composite, raw data fields) |
+| `startup_timing_scores` | STS per startup (3 sub-scores + composite) |
+| `thi_snapshots` | Historical THI scores per thesis (for momentum calculation) |
+| `indicators` | Abstraction layer for feed groups (not heavily used) |
+
+### Supporting Tables
+
+| Table | Purpose |
+|-------|---------|
+| `feed_cache` | Historical raw + normalized values per feed fetch |
+| `conviction_snapshots` | History of user conviction changes |
+| `macro_header` | Current macro regime (FFR, 10Y-2Y spread, VIX) |
+| `portfolio_positions` | User's actual positions with entry price and P&L |
+| `portfolio_snapshots` | Historical portfolio value snapshots |
+
+### Key Relationships
+
+- Thesis → many Effects (cascade delete)
+- Thesis → many EquityBets (direct thesis bets)
+- Effect → many EquityBets (effect-level bets)
+- Thesis → many StartupOpportunities (direct)
+- Effect → many StartupOpportunities (effect-level)
+- Thesis → many DataFeeds (thesis-level feeds)
+- Effect → many DataFeeds (effect-level feeds)
+- EquityBet → one EquityFitScore (1:1)
+- StartupOpportunity → one StartupTimingScore (1:1)
+- Effect → parent Effect (self-referencing for 3rd order)
+
+### Schema Changes Without Alembic
+
+The following columns were added via raw `ALTER TABLE` on the SQLite DB (no Alembic migration exists):
+
+```sql
+ALTER TABLE theses ADD COLUMN evidence_explanation TEXT;
+ALTER TABLE theses ADD COLUMN momentum_explanation TEXT;
+ALTER TABLE theses ADD COLUMN conviction_explanation TEXT;
+ALTER TABLE effects ADD COLUMN evidence_explanation TEXT;
+ALTER TABLE effects ADD COLUMN momentum_explanation TEXT;
+ALTER TABLE effects ADD COLUMN conviction_explanation TEXT;
+```
+
+If the DB is deleted, `Base.metadata.create_all()` recreates everything cleanly.
+
+---
+
+## Scoring System
+
+All weights are defined in `formulas.json` at the project root and loaded by `backend/config.py` at startup.
+
+### THI — Thesis Health Index (0–100)
+
+```
+THI = (Evidence × 0.50) + (Momentum × 0.30) + (Data Quality × 0.20)
+```
+
+**Evidence** (real data-driven): Weighted average of normalized DataFeed scores. Each feed is percentile-ranked against its own 5-year history from FRED. Feeds grouped by type: Flow (35%), Structural (30%), Adoption (20%), Policy (15%). Offline feeds have their weight redistributed to active ones.
+
+**Momentum** (real data-driven, but needs history): Rate of change of evidence score over 30d/90d/1yr from THI snapshots. `Momentum = (30d_Δ × 0.50) + (90d_Δ × 0.30) + (1yr_Δ × 0.20)`. Delta of ±30 evidence points maps to 0–100 momentum. Returns 50 (neutral) with <2 snapshots. **Currently shows neutral for all theses due to insufficient snapshot history.**
+
+**Data Quality** (real data-driven): `(Signal Agreement × 0.40) + (Freshness × 0.35) + (Source Quality × 0.25)`. Agreement = low variance among feed scores. Freshness = % of feeds currently live. Source quality base = 70.
+
+**Direction thresholds**: ≥60 = CONFIRMING, ≤40 = REFUTING, 40–60 = NEUTRAL.
+
+**Child THI**: `Child THI = (Parent THI × 0.40) + (Child's own score × 0.60)`. Default inheritance weight is 0.40.
+
+### EFS — Equity Fit Score (0–100)
+
+```
+EFS = (Revenue Alignment × 0.30) + (Thesis Beta × 0.25) + (Momentum Alignment × 0.20)
+    + (Valuation Buffer × 0.15) + (Signal Purity × 0.10)
+```
+
+| Component | Data Source | Real vs Estimated |
+|-----------|-----------|-------------------|
+| Revenue Alignment | SEC EDGAR SIC + keyword matching | **Estimated** — uses industry keywords + hardcoded overrides, not actual 10-K segment parsing |
+| Thesis Beta | THI snapshots + Yahoo Finance price history | **Real** when ≥6 snapshots exist, otherwise returns 50 (neutral) |
+| Momentum Alignment | Yahoo Finance 6mo prices + THI snapshots | **Real** — compares 90d stock return vs THI delta |
+| Valuation Buffer | Yahoo Finance forward P/E vs sector ETF P/E | **Real** |
+| Signal Purity | SEC EDGAR SIC + hardcoded conglomerate map | **Partially estimated** — SIC-based heuristic, not actual segment count |
+
+### STS — Startup Timing Score (0–100)
+
+```
+STS = (THI Alignment × 0.40) + (THI Velocity × 0.35) + (Competition Density Inverted × 0.25)
+```
+
+| Component | Data Source | Real vs Estimated |
+|-----------|-----------|-------------------|
+| THI Alignment | Current thesis THI score | **Real** |
+| THI Velocity | THI 30-day delta from snapshots | **Real** when history exists, otherwise 50 |
+| Competition Density | Crunchbase (optional) or timing label heuristic | **Estimated** — falls back to mapping TOO_EARLY=15, RIGHT_TIMING=45, CROWDING=80 |
+
+---
+
+## Data Pipeline
+
+### Feed Refresh Flow
+
+1. User clicks REFRESH FEEDS (or it's triggered after thesis generation)
+2. `POST /api/theses/{id}/feeds/refresh` → `feed_refresh.refresh_thesis_feeds()`
+3. For each DataFeed linked to the thesis:
+   - FRED feeds: `fred_client.fetch_fred_series()` → fetches 5yr history → `normalize_percentile()` → score 0-100
+   - Google Trends feeds: `gtrends_client.fetch_google_trends()` → normalize → score
+   - Feeds with `confirming_direction: "lower"` get score flipped (100 - score)
+4. Compute evidence = weighted average of feed scores (redistributing offline weights)
+5. Compute momentum from THI snapshot deltas (30d/90d/1yr)
+6. Compute data quality (agreement + freshness + source quality)
+7. Compute THI = weighted composite
+8. Save THI snapshot for future momentum calculation
+9. Update child effect THIs via inheritance formula
+10. Return updated thesis
+
+### Data Sources
+
+| Source | Status | API Key Required | What It Provides |
+|--------|--------|-----------------|-----------------|
+| FRED | **Wired** | Yes (`FRED_API_KEY`) | Economic time series (rates, money supply, employment, CPI, yield curves) |
+| Google Trends | **Wired** | No | Search interest as adoption proxy |
+| Yahoo Finance | **Wired** | No (via `yfinance` library) | Stock fundamentals, price history, sector P/E |
+| SEC EDGAR | **Wired** | No | Company SIC codes, segment count estimation |
+| Crunchbase | **Stubbed** | Optional (`CRUNCHBASE_API_KEY`) | Competition density for STS — falls back to heuristic |
+| BLS | **Not wired** | Would need `BLS_API_KEY` | Referenced in methodology page but not implemented |
+| Alpha Vantage | **Not wired** | Would need `ALPHA_VANTAGE_API_KEY` | Referenced in config but not used |
+| Polygon | **Not wired** | Would need `POLYGON_API_KEY` | Referenced in config but not used |
+
+### Required Environment Variables
+
+```bash
+FRED_API_KEY=<required>        # Federal Reserve Economic Data
+EIA_API_KEY=<required>         # Energy Information Administration (checked at startup)
+ANTHROPIC_API_KEY=<required>   # Claude AI for thesis/effect generation
+```
+
+Optional:
+```bash
+POLYGON_API_KEY=<optional>
+CRUNCHBASE_API_KEY=<optional>
+ALPHA_VANTAGE_API_KEY=<optional>
+```
+
+---
+
+## Known Issues & Bugs
+
+1. **Backend startup crash if DB has old schema**: Adding explanation columns to models.py without Alembic means existing DBs crash with `no such column: theses.evidence_explanation`. Fix: delete `tangentbook.db` or run manual ALTER TABLE statements.
+
+2. **yfinance not in requirements.txt**: The `yfinance` library is used by `efs_service.py` but not listed in `requirements.txt`. Install manually: `pip install yfinance`.
+
+3. **Momentum always shows neutral**: All theses have <2 THI snapshots. Need multiple feed refresh cycles over time to build history. The UI handles this gracefully but the data is always 50.
+
+4. **Revenue alignment is keyword-estimated, not real**: SEC 10-K segment revenue parsing is not implemented. Uses SIC code + keyword matching + hardcoded ticker-to-alignment overrides.
+
+5. **No automatic feed refresh**: APScheduler is in requirements but not wired. Feeds only refresh on manual button click or after thesis generation.
+
+6. **Several one-off scripts in backend/**: `seed_9bets.py`, `seed_gaps.py`, `seed_gaps2.py`, `seed_gaps3.py`, `dedup_tickers.py`, `fix_effect_thi_scores.py`, etc. These were used during development and could be cleaned up.
+
+7. **Legacy components not cleaned up**: `Header.tsx`, `EffectChain.tsx`, `NewThesisPanel.tsx`, `ThemeToggle.tsx` are from earlier iterations. Some may still be imported somewhere but the current pages have inline equivalents.
+
+8. **Effect detail page is a redirect**: `/thesis/[id]/effect/[effectId]` just redirects to the thesis page. No standalone effect view.
+
+9. **No database backups or migration system**: SQLite file can be wiped accidentally. No Alembic.
+
+10. **CORS allows all origins**: `allow_origins=["*"]` in main.py. Fine for local dev, needs restricting for production.
+
+11. **Frontend port conflict**: If port 3000 is in use, Next.js silently falls back to 3001. Can cause confusion.
+
+12. **Freshness score mismatch**: Backend computes freshness one way, frontend overrides the display calculation. These should be reconciled.
+
+---
+
+## Immediate Next Steps
+
+1. **Wire up APScheduler for periodic feed refresh** — Run `refresh_all_theses()` every 6 hours to build THI snapshot history for momentum scoring. This is the single highest-impact change: it makes momentum scoring real.
+
+2. **Add Alembic for migrations** — Prevent future schema change crashes. Generate initial migration from current models.
+
+3. **Implement real SEC 10-K revenue segment parsing** — Replace keyword-matching revenue alignment with actual segment revenue extraction from EDGAR XBRL filings.
+
+4. **Add `yfinance` to requirements.txt** — Simple fix, currently missing.
+
+5. **Clean up one-off scripts** — Move `seed_*.py`, `fix_*.py`, `dedup_*.py` to a `scripts/` directory or delete them.
+
+6. **Remove legacy components** — Audit `Header.tsx`, `EffectChain.tsx`, `NewThesisPanel.tsx`, `ThemeToggle.tsx` for any remaining imports, then delete unused ones.
+
+7. **Build standalone effect detail page** — Replace the redirect with a real page showing effect-specific feeds, scoring breakdown, and bets.
+
+8. **Add error toast notifications** — Replace console.error and brief button label changes with a proper toast system.
+
+9. **Reconcile freshness score calculation** — Make backend and frontend agree on how freshness is computed and displayed.
+
+10. **Add basic auth** — Even a simple API key or session token to prevent open access.
+
+---
+
+## How to Run
+
+### Prerequisites
+
+- Python 3.11
+- Node.js 18+
+- FRED API key (free from https://fred.stlouisfed.org/docs/api/api_key.html)
+- Anthropic API key (for thesis generation)
+
+### Backend
+
+```bash
+cd backend
+python3.11 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+pip install yfinance  # Not in requirements.txt yet
+
+# Set environment variables
+export FRED_API_KEY=your_key_here
+export EIA_API_KEY=your_key_here
+export ANTHROPIC_API_KEY=your_key_here
+
+# Start server (creates tangentbook.db and seeds on first run)
+python3.11 -m uvicorn main:app --port 8000
+```
+
+Backend runs on `http://localhost:8000`. API docs at `http://localhost:8000/docs`.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend runs on `http://localhost:3000` (or 3001 if 3000 is occupied).
+
+### First Run
+
+1. Start backend — it creates the DB and seeds 16 theses automatically
+2. Start frontend — dashboard shows seeded theses
+3. Click any thesis to see the tree view
+4. Click REFRESH FEEDS on a thesis to trigger first data fetch
+5. Generate a new thesis by typing a sentence in the dashboard input
+
+### Ports
+
+| Service | Port |
+|---------|------|
+| Backend (FastAPI) | 8000 |
+| Frontend (Next.js) | 3000 (or 3001) |
+
+---
+
+## Git History Summary
+
+Last 20 commits (newest first):
+
+1. **formulas.json as single source of truth** — Created formulas.json, backend services load weights from it, exposed GET /api/formulas, added explanation fields to models, trigger feed refresh after generation
+2. **Dashboard polish** — All-caps titles, card padding, equal height cards, logo sizing
+3. **Multi-card expand** — Independent card toggle (multiple open simultaneously)
+4. **PROGRESS.md** — Added progress documentation
+5. **Gradient progress bars** — Canvas-based gradient bars replacing block characters, 100-stop cubic ease-in
+6. **Equity bet card layout** — Fixed inconsistent heights with line clamping
+7. **Revert to 3-col grid** — Removed category columns, back to flat grid sorted by EFS
+8. **EFS + STS system** — Full Equity Fit Score and Startup Timing Score with Yahoo/SEC/Crunchbase
+9. **AI prompt fixes** — Plain startup names, category layout with context
+10. **Unique tickers** — No parent/child overlap, validation script
+11. **Feeds root cause fix** — Explicit formulas, bespoke effect scores, refresh buttons
+12. **Scoring breakdown** — 2nd/3rd order breakdown, feed context stats, 3x3 bet grid, portfolio tracker
+13. **Feed pipeline fix** — Scoring engine connected, refresh all, full 2nd/3rd order effects seeded
+14. **Thesis detail redesign** — Hero/breakdown/tabs/feeds/effect thumbnails + scoring API
+15. **Effect chain redesign** — Vertical accordion + equity bet diversification
+16. **2nd order effect cards** — Collapsed clean, expand for detail
+17. **Sparkline tooltip** — Canary feedback indicator, GLP-1 evidence score fix
+18. **Yahoo Finance sparklines** — Real price data sparklines + feedback indicator fix
+19. **Feedback indicator logic** — Canary only, audit roles
+20. **Sparkline layout** — Moved to full-width row below header

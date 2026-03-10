@@ -163,6 +163,19 @@ export default function Home() {
 
         {/* Right: actions */}
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <a
+            href="/methodology"
+            style={{
+              fontFamily: "var(--font-mono), 'JetBrains Mono', monospace",
+              fontSize: "0.75rem", fontWeight: 700,
+              letterSpacing: "0.1em", textTransform: "uppercase",
+              color: "#888", textDecoration: "none",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#888")}
+          >
+            METHODOLOGY
+          </a>
           <button
             onClick={handleRefreshAll}
             style={{
