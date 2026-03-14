@@ -19,15 +19,104 @@ _STATIC_UNIVERSE_PATH = os.path.join(_DATA_DIR, "ticker_universe.json")
 _EDGAR_CACHE_PATH = os.path.join(_DATA_DIR, "edgar_universe_cache.json")
 _SECTOR_CACHE_PATH = os.path.join(_DATA_DIR, "sector_cache.json")
 
-_EDGAR_CACHE_MAX_AGE = 7 * 24 * 3600  # 7 days
+_EDGAR_CACHE_MAX_AGE = 7 * 24 * 3600
 _EDGAR_URL = "https://www.sec.gov/files/company_tickers.json"
 _EDGAR_HEADERS = {"User-Agent": "TangentBook research@tangentbook.com", "Accept": "application/json"}
 
-# In-memory caches loaded lazily
 _edgar_universe = None
 _sector_cache = None
 _sector_cache_dirty = False
 
+# ── SIC-to-sector mapping ────────────────────────────────────────────────────
+
+_SIC_SECTOR_RANGES = [
+    (1000, 1499, "materials"),
+    (1500, 1799, "industrials"),
+    (2000, 2199, "consumer staples"),
+    (2200, 2799, "consumer staples"),
+    (2800, 2899, "materials"),
+    (2900, 2999, "energy"),
+    (3000, 3199, "materials"),
+    (3200, 3499, "materials"),
+    (3500, 3599, "industrials"),
+    (3600, 3669, "technology"),
+    (3670, 3679, "technology"),
+    (3680, 3699, "technology"),
+    (3700, 3799, "industrials"),
+    (3800, 3899, "technology"),
+    (3900, 3999, "consumer discretionary"),
+    (4000, 4499, "industrials"),
+    (4500, 4599, "industrials"),
+    (4600, 4699, "energy"),
+    (4700, 4799, "industrials"),
+    (4800, 4899, "technology"),
+    (4900, 4999, "utilities"),
+    (5000, 5199, "consumer discretionary"),
+    (5200, 5999, "consumer discretionary"),
+    (6000, 6199, "financials"),
+    (6200, 6299, "financials"),
+    (6300, 6499, "financials"),
+    (6500, 6599, "real estate"),
+    (6600, 6699, "financials"),
+    (6700, 6799, "financials"),
+    (7000, 7299, "consumer discretionary"),
+    (7300, 7369, "industrials"),
+    (7370, 7379, "technology"),
+    (7380, 7399, "industrials"),
+    (7500, 7599, "consumer discretionary"),
+    (7600, 7699, "consumer discretionary"),
+    (7800, 7999, "consumer discretionary"),
+    (8000, 8099, "healthcare"),
+    (8100, 8199, "financials"),
+    (8200, 8299, "consumer discretionary"),
+    (8700, 8799, "industrials"),
+]
+
+_SIC_INDUSTRY_MAP = {
+    "3674": "Semiconductors",
+    "3672": "Printed Circuit Boards",
+    "3679": "Electronic Components",
+    "3559": "Semiconductor Equipment",
+    "3825": "Instruments for Measuring",
+    "3669": "Communications Equipment",
+    "2836": "Pharmaceutical Preparations",
+    "2830": "Drugs",
+    "1311": "Crude Petroleum and Natural Gas",
+    "1382": "Oil and Gas Field Services",
+    "4911": "Electric Services",
+    "4931": "Electric and Other Services Combined",
+    "6022": "State Commercial Banks",
+    "6021": "National Commercial Banks",
+    "7372": "Prepackaged Software",
+    "7371": "Computer Programming Services",
+    "6726": "Investment Offices",
+    "5912": "Drug Stores and Proprietary Stores",
+    "8011": "Offices and Clinics of Doctors",
+    "8051": "Skilled Nursing Care Facilities",
+}
+
+
+def _sic_to_sector(sic_code):
+    try:
+        sic_int = int(sic_code)
+    except (ValueError, TypeError):
+        return "other"
+    for low, high, sector in _SIC_SECTOR_RANGES:
+        if low <= sic_int <= high:
+            return sector
+    return "other"
+
+
+def _sic_to_industry(sic_code, sic_description=""):
+    mapped = _SIC_INDUSTRY_MAP.get(str(sic_code))
+    if mapped:
+        return mapped
+    if sic_description:
+        return sic_description
+    return ""
+
+
+# ── Cache helpers ────────────────────────────────────────────────────────────
 
 def _load_static_universe():
     with open(_STATIC_UNIVERSE_PATH) as f:
@@ -98,6 +187,8 @@ def _save_edgar_cache(tickers):
         logger.error(f"Failed to write EDGAR cache: {e}")
 
 
+# ── EDGAR fetch ──────────────────────────────────────────────────────────────
+
 async def fetch_edgar_universe():
     cached = _load_edgar_cache()
     if cached is not None:
@@ -115,8 +206,9 @@ async def fetch_edgar_universe():
         for entry in raw.values():
             ticker = entry.get("ticker", "").strip()
             name = entry.get("title", "").strip()
-            if ticker and name:
-                tickers.append({"ticker": ticker.upper(), "name": name})
+            cik = entry.get("cik_str")
+            if ticker and name and cik is not None:
+                tickers.append({"ticker": ticker.upper(), "name": name, "cik": int(cik)})
 
         _save_edgar_cache(tickers)
         logger.info(f"EDGAR universe fetched: {len(tickers)} tickers")
@@ -126,51 +218,67 @@ async def fetch_edgar_universe():
         return None
 
 
-async def _yf_fetch_sector(ticker):
-    import yfinance as yf
+# ── EDGAR SIC-based sector lookup ────────────────────────────────────────────
+
+async def _fetch_sic_from_edgar(cik, client):
+    cik_padded = str(cik).zfill(10)
+    url = f"https://data.sec.gov/submissions/CIK{cik_padded}.json"
     try:
-        loop = asyncio.get_event_loop()
-        info = await loop.run_in_executor(
-            None, lambda t=ticker: dict(yf.Ticker(t).info or {})
-        )
-        return info.get("sector", ""), info.get("industry", "")
+        resp = await client.get(url, headers=_EDGAR_HEADERS)
+        if resp.status_code != 200:
+            return None, None
+        data = resp.json()
+        sic = data.get("sic", "")
+        sic_desc = data.get("sicDescription", "")
+        return sic, sic_desc
     except Exception:
-        return "", ""
+        return None, None
 
 
-async def _batch_fetch_sectors(tickers, batch_size=50):
+async def _batch_fetch_sic_from_edgar(entries, batch_size=100):
     cache = _load_sector_cache()
-    missing = [t for t in tickers if t.upper() not in cache]
+    missing = [(e["ticker"], e["cik"]) for e in entries if e["ticker"].upper() not in cache]
     if not missing:
         return
 
-    for i in range(0, len(missing), batch_size):
-        batch = missing[i:i + batch_size]
-        tasks = [_yf_fetch_sector(t) for t in batch]
-        results = await asyncio.gather(*tasks)
-        for ticker, (sector, industry) in zip(batch, results):
-            _update_sector_cache(ticker, sector, industry)
+    populated = 0
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        for i in range(0, len(missing), batch_size):
+            batch = missing[i:i + batch_size]
+            tasks = [_fetch_sic_from_edgar(cik, client) for _, cik in batch]
+            results = await asyncio.gather(*tasks)
+            for (ticker, _cik), (sic, sic_desc) in zip(batch, results):
+                if sic:
+                    sector = _sic_to_sector(sic)
+                    industry = _sic_to_industry(sic, sic_desc)
+                    _update_sector_cache(ticker, sector, industry)
+                    populated += 1
+
+            if (i + batch_size) % 500 == 0 or i + batch_size >= len(missing):
+                _save_sector_cache()
+                logger.info(f"Sector cache progress: {min(i + batch_size, len(missing))}/{len(missing)} fetched, {populated} populated")
 
     _save_sector_cache()
 
 
-async def prepopulate_sector_cache(count=500):
+async def prepopulate_sector_cache_from_edgar():
     edgar = await fetch_edgar_universe()
     if not edgar:
         return
 
-    sorted_tickers = sorted(edgar, key=lambda x: x["ticker"])[:count]
     cache = _load_sector_cache()
-    need = [t["ticker"] for t in sorted_tickers if t["ticker"].upper() not in cache]
+    need = [e for e in edgar if e["ticker"].upper() not in cache and "cik" in e]
 
     if not need:
-        logger.info("Sector cache already has first 500 tickers")
+        logger.info(f"Sector cache already complete ({len(cache)} entries)")
         return
 
-    logger.info(f"Pre-populating sector cache for {len(need)} tickers...")
-    await _batch_fetch_sectors(need, batch_size=50)
-    logger.info(f"Sector cache pre-populated, total entries: {len(_load_sector_cache())}")
+    logger.info(f"Pre-populating sector cache from EDGAR SIC data for {len(need)} tickers...")
+    await _batch_fetch_sic_from_edgar(need, batch_size=100)
+    logger.info(f"Sector cache pre-populated from EDGAR, total entries: {len(_load_sector_cache())}")
 
+
+# ── Claude screening profile ────────────────────────────────────────────────
 
 def _clean_json(text):
     text = text.strip()
@@ -245,6 +353,8 @@ Generate a screening profile to find stocks that express this thesis."""
         logger.error(f"Screening profile JSON parse error: {e}")
         return None
 
+
+# ── Screening logic ──────────────────────────────────────────────────────────
 
 def _screen_static_fallback(profile):
     logger.warning("Using static ticker_universe.json as fallback for screening")
@@ -335,9 +445,14 @@ async def screen_ticker_universe(profile):
     if not sector_filtered:
         return _screen_static_fallback(profile)
 
-    uncached = [e["ticker"] for e in sector_filtered if e["ticker"].upper() not in cache]
-    if uncached:
-        await _batch_fetch_sectors(uncached, batch_size=50)
+    uncached_entries = [
+        e for e in edgar
+        if e["ticker"] in {sf["ticker"] for sf in sector_filtered}
+        and e["ticker"].upper() not in cache
+        and "cik" in e
+    ]
+    if uncached_entries:
+        await _batch_fetch_sic_from_edgar(uncached_entries, batch_size=100)
         cache = _load_sector_cache()
 
     scored = []
@@ -393,9 +508,6 @@ async def enrich_with_yfinance(candidates):
             candidate["yf_industry"] = info.get("industry", "")
             candidate["yf_description"] = (info.get("longBusinessSummary") or "")[:300]
             candidate["company_name"] = info.get("shortName") or info.get("longName") or candidate["name"]
-
-            if not cached or not cached.get("sector"):
-                _update_sector_cache(ticker_upper, candidate["yf_sector"], candidate["yf_industry"])
         except Exception:
             candidate["yf_sector"] = cached.get("sector", "") if cached else ""
             candidate["yf_industry"] = cached.get("industry", "") if cached else ""
@@ -404,7 +516,6 @@ async def enrich_with_yfinance(candidates):
 
     tasks = [_fetch_one(c) for c in candidates]
     await asyncio.gather(*tasks)
-    _save_sector_cache()
     return candidates
 
 
