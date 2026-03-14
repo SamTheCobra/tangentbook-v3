@@ -108,13 +108,36 @@ async def refresh_thesis_feeds(thesis_id: str, db: Session):
     for effect in thesis.effects:
         _update_effect_thi(effect, thi, db)
 
+    # Re-screen equity bets using updated thesis data
+    try:
+        from services.screening_service import screen_and_score
+        await screen_and_score(thesis_id, db)
+    except Exception as e:
+        logger.warning(f"Screening after feed refresh failed (non-fatal): {e}")
+
     logger.info(f"Thesis '{thesis.title}' THI updated: {old_thi} -> {thi}")
 
 
 def _update_effect_thi(effect: Effect, parent_thi: float, db: Session):
     """Update an effect's THI based on parent inheritance."""
+    effect_feeds = db.query(DataFeed).filter(
+        DataFeed.effect_id == effect.id,
+    ).all()
+    has_active_feeds = any(
+        f.normalized_score is not None for f in effect_feeds
+    ) if effect_feeds else False
+
+    if not has_active_feeds:
+        effect.thi_score = None
+        effect.thi_direction = "neutral"
+        effect.thi_trend = "stable"
+        db.commit()
+        for child in (effect.child_effects or []):
+            _update_effect_thi(child, parent_thi, db)
+        return
+
     old = effect.thi_score
-    child_score = effect.thi_score  # Use existing as child's own indicator score
+    child_score = effect.thi_score
     new_thi = compute_child_thi(parent_thi, child_score, effect.inheritance_weight)
     effect.thi_score = new_thi
     effect.thi_direction = score_to_direction(new_thi)

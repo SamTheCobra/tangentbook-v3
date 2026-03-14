@@ -162,6 +162,7 @@ export interface EquityBet {
   currentPrice?: number;
   priceChange12mPct?: number;
   priceHistory?: { date: string; close: number }[];
+  source?: string;
 }
 
 export interface StartupOpportunity {

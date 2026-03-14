@@ -19,6 +19,7 @@ from models import (
     EquityFitScore, StartupTimingScore, THISnapshot,
 )
 from services.feed_refresh import refresh_thesis_feeds
+from services.screening_service import screen_and_score
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["generate"])
@@ -94,6 +95,11 @@ The JSON must have this exact structure:
     {
       "title": "Effect title",
       "description": "2-3 sentence description of this second-order effect",
+      "causal_mechanism": "One sentence naming the specific mechanism by which the parent thesis causes this effect",
+      "time_horizon": "near|mid|long",
+      "suggested_signals": [
+        { "type": "fred", "id": "FRED_SERIES_ID", "label": "Human readable name" }
+      ],
       "thi_score": 60.0,
       "score_breakdown": {
         "evidence": { "score": 45, "explanation": "1 sentence on what evidence supports this effect" },
@@ -108,6 +114,11 @@ The JSON must have this exact structure:
     {
       "title": "Effect title",
       "description": "2-3 sentence description of this third-order effect",
+      "causal_mechanism": "One sentence naming the specific mechanism by which the parent causes this effect",
+      "time_horizon": "near|mid|long",
+      "suggested_signals": [
+        { "type": "gtrends", "id": "search keyword", "label": "Human readable name" }
+      ],
       "thi_score": 55.0,
       "score_breakdown": {
         "evidence": { "score": 35, "explanation": "1 sentence on what evidence supports this effect" },
@@ -129,6 +140,9 @@ Rules:
 - Generate exactly 9 startup_opportunities for the main thesis
 - Generate exactly 2 second_order_effects, each with 9 equity_bets and 9 startup_opportunities
 - Generate exactly 2 third_order_effects, each with 9 equity_bets and 9 startup_opportunities
+- Every effect MUST include "causal_mechanism": a single sentence naming the specific transmission mechanism (not just restating the effect). Bad: "Food companies lose revenue." Good: "GLP-1 adoption reduces caloric intake per capita, directly compressing volume demand for high-calorie packaged goods."
+- Every effect MUST include "time_horizon": one of "near" (0-12 months), "mid" (1-3 years), "long" (3+ years)
+- Every effect MUST include "suggested_signals": an array of 1-3 objects, each with "type" ("fred" or "gtrends"), "id" (real FRED series ID or Google Trends keyword), and "label" (human-readable name). Use real FRED series IDs (e.g. "DGS10", "CPIAUCSL", "M2SL") for macro/economic effects and real Google Trends keywords for behavioral/consumer effects. If no real signal can track an effect, do not generate it.
 - thi_score should be 0-100 reflecting how strong the evidence is
 - efs_score should be 0-100 reflecting how well the stock captures the thesis
 - sts_score should be 0-100 reflecting timing quality
@@ -227,6 +241,9 @@ def save_generated_thesis(gen: dict, conviction: int, db: Session) -> str:
             order=2,
             title=so["title"],
             description=so.get("description", ""),
+            causal_mechanism=so.get("causal_mechanism"),
+            time_horizon=so.get("time_horizon"),
+            suggested_signals=so.get("suggested_signals"),
             thi_score=float(so.get("thi_score", 50.0)),
             evidence_explanation=esb.get("evidence", {}).get("explanation"),
             momentum_explanation=esb.get("momentum", {}).get("explanation"),
@@ -245,6 +262,9 @@ def save_generated_thesis(gen: dict, conviction: int, db: Session) -> str:
             order=3,
             title=to["title"],
             description=to.get("description", ""),
+            causal_mechanism=to.get("causal_mechanism"),
+            time_horizon=to.get("time_horizon"),
+            suggested_signals=to.get("suggested_signals"),
             thi_score=float(to.get("thi_score", 50.0)),
             evidence_explanation=esb.get("evidence", {}).get("explanation"),
             momentum_explanation=esb.get("momentum", {}).get("explanation"),
@@ -270,6 +290,7 @@ def _save_bets(bets: list, thesis_id: str, effect_id: str | None, db: Session):
             role=b.get("role", "BENEFICIARY"),
             rationale=b.get("rationale", ""),
             time_horizon=b.get("time_horizon", "1-3yr"),
+            source="ai",
         )
         db.add(bet)
         db.flush()
@@ -325,13 +346,15 @@ async def generate_thesis(data: GenerateRequest, db: Session = Depends(get_db)):
     gen = await call_claude(data.raw_thesis)
     thesis_id = save_generated_thesis(gen, data.conviction, db)
 
-    # Trigger real feed refresh to overwrite Claude's estimated THI with data-driven scores.
-    # NOTE: Newly generated theses have no DataFeeds configured yet, so this will
-    # return early gracefully. Once feeds are added, the scheduled refresh will pick them up.
     try:
         await refresh_thesis_feeds(thesis_id, db)
     except Exception as e:
         logger.warning(f"Feed refresh after generation failed (non-fatal): {e}")
+
+    try:
+        await screen_and_score(thesis_id, db)
+    except Exception as e:
+        logger.warning(f"Screening after generation failed (non-fatal): {e}")
 
     return {"id": thesis_id}
 
@@ -351,6 +374,12 @@ Each effect must have this structure:
 {
   "title": "Effect title (concise, specific)",
   "description": "2-3 sentence description of this causal effect and why it follows from the thesis",
+  "causal_mechanism": "One sentence explaining the specific mechanism by which the parent thesis causes this effect. Name the mechanism, don't just restate the effect. Bad: 'Food companies lose revenue.' Good: 'GLP-1 adoption reduces caloric intake per capita, directly compressing volume demand for high-calorie packaged goods.'",
+  "time_horizon": "near|mid|long",
+  "suggested_signals": [
+    { "type": "fred", "id": "FRED_SERIES_ID", "label": "Human readable name" },
+    { "type": "gtrends", "id": "search keyword string", "label": "Human readable name" }
+  ],
   "thi_score": <float 0-100>,
   "score_breakdown": {
     "evidence": { "score": <float>, "explanation": "1 sentence on what evidence supports this effect" },
@@ -387,6 +416,12 @@ Rules:
 - Effects must be DISTINCT from the existing ones listed
 - Be specific and data-driven in rationales
 - score_breakdown MUST be included for every effect. Each explanation should be 1 short sentence describing what data or signal drives that component score.
+- "causal_mechanism" must name a SPECIFIC mechanism (e.g. a transmission channel, feedback loop, or supply/demand dynamic), not just restate the effect title.
+- "time_horizon" must be one of: "near" (0-12 months), "mid" (1-3 years), "long" (3+ years)
+- "suggested_signals" must contain 1-3 signals. Each signal must be a real, trackable data source:
+  - type "fred": use a real FRED series ID (e.g. "DGS10", "CPIAUCSL", "M2SL"). Prefer FRED for macro/economic effects.
+  - type "gtrends": use a real Google Trends search keyword (e.g. "bitcoin ETF", "layoffs tech"). Prefer Google Trends for behavioral/consumer/adoption effects.
+- If no real FRED series or Google Trends keyword can plausibly track an effect, do NOT generate that effect. Every effect must be empirically trackable.
 
 CRITICAL — THI SCORE INDEPENDENCE:
 - Each effect MUST have its own independently reasoned thi_score between 0-100.
@@ -464,6 +499,9 @@ Generate {data.count} new {order_label}-order causal effects for this thesis. Re
             order=data.order,
             title=eff["title"],
             description=eff.get("description", ""),
+            causal_mechanism=eff.get("causal_mechanism"),
+            time_horizon=eff.get("time_horizon"),
+            suggested_signals=eff.get("suggested_signals"),
             thi_score=float(eff.get("thi_score", 50.0)),
             evidence_explanation=esb.get("evidence", {}).get("explanation"),
             momentum_explanation=esb.get("momentum", {}).get("explanation"),

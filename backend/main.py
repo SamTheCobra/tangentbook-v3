@@ -68,6 +68,15 @@ async def startup():
     finally:
         db.close()
 
+    # Pre-populate sector cache in background (fire and forget)
+    async def _prepopulate():
+        try:
+            from services.screening_service import prepopulate_sector_cache
+            await prepopulate_sector_cache(500)
+        except Exception as e:
+            logger.error(f"Sector cache pre-population failed: {e}")
+    asyncio.create_task(_prepopulate())
+
     # Start background scheduler
     scheduler.add_job(
         scheduled_refresh,

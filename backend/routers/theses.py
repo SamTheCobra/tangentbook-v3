@@ -9,7 +9,7 @@ from config import FORMULAS
 from database import get_db
 from models import (
     Thesis, Effect, EquityBet, StartupOpportunity,
-    ConvictionSnapshot, THISnapshot
+    ConvictionSnapshot, THISnapshot, DataFeed
 )
 
 router = APIRouter(prefix="/api", tags=["theses"])
@@ -131,6 +131,10 @@ def thesis_to_dict(t: Thesis) -> dict:
 
 
 def effect_to_dict(e: Effect) -> dict:
+    feeds = e.feeds if e.feeds else []
+    has_active_feeds = any(f.normalized_score is not None for f in feeds)
+    awaiting_data = not has_active_feeds
+
     return {
         "id": e.id,
         "thesisId": e.thesis_id,
@@ -138,8 +142,12 @@ def effect_to_dict(e: Effect) -> dict:
         "order": e.order,
         "title": e.title,
         "description": e.description,
+        "causalMechanism": e.causal_mechanism,
+        "timeHorizon": e.time_horizon,
+        "suggestedSignals": e.suggested_signals,
         "inheritanceWeight": e.inheritance_weight,
         "isCollapsed": e.is_collapsed,
+        "awaitingData": awaiting_data,
         "thi": {
             "score": e.thi_score,
             "direction": e.thi_direction,
@@ -173,6 +181,7 @@ def bet_to_dict(b: EquityBet) -> dict:
         "currentPrice": b.current_price,
         "priceChange12mPct": b.price_change_12m_pct,
         "priceHistory": b.price_history,
+        "source": b.source,
     }
 
 

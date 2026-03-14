@@ -78,6 +78,10 @@ class Effect(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    causal_mechanism = Column(String, nullable=True)
+    time_horizon = Column(String, nullable=True)
+    suggested_signals = Column(JSON, nullable=True)
+
     # THI fields
     thi_score = Column(Float, default=50.0)
     thi_direction = Column(String, default="neutral")
@@ -184,6 +188,7 @@ class EquityBet(Base):
     current_price = Column(Float, nullable=True)
     price_change_12m_pct = Column(Float, nullable=True)
     price_history = Column(JSON, nullable=True)
+    source = Column(String, nullable=True, default="ai")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     thesis = relationship("Thesis", back_populates="equity_bets", foreign_keys=[thesis_id])

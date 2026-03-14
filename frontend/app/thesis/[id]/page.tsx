@@ -123,6 +123,7 @@ export default function ThesisTreePage() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [activePanels, setActivePanels] = useState<Record<string, string | null>>({});
   const [playsTabs, setPlaysTabs] = useState<Record<string, "stocks" | "startups">>({});
+  const [stocksSubTabs, setStocksSubTabs] = useState<Record<string, "ai" | "screened">>({});
   const [efsMap, setEfsMap] = useState<Record<string, EFSScore>>({});
   const [stsMap, setStsMap] = useState<Record<string, STSScore>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -706,120 +707,181 @@ export default function ThesisTreePage() {
                       </div>
 
                       {/* Stocks */}
-                      {cardPlaysTab === "stocks" && (
-                        <div style={{ maxHeight: "500px", overflowY: "auto" }}>
-                          {node.equityBets.map((bet, betIdx) => {
-                            const efs = efsMap[bet.id];
-                            const isBetExpanded = cardExpandedBet === bet.id;
-                            const barsRevealed = revealedPanels.has(node.id);
-                            return (
-                              <div key={bet.id} style={{
-                                marginBottom: "12px", paddingBottom: "12px",
-                                borderBottom: "1px solid #1a1a1a",
-                              }}>
-                                {/* Stock header row */}
-                                <div
-                                  onClick={() => setExpandedBetIds((prev) => ({
-                                    ...prev,
-                                    [node.id]: isBetExpanded ? null : bet.id,
-                                  }))}
-                                  style={{ cursor: "pointer" }}
-                                >
-                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                                    <a
-                                      href={`https://finance.yahoo.com/quote/${bet.ticker}`}
-                                      target="_blank" rel="noopener noreferrer"
-                                      onClick={(e) => e.stopPropagation()}
-                                      style={{
-                                        fontFamily: "var(--font-mono), monospace",
-                                        fontSize: "14px", fontWeight: 700,
-                                        color: "var(--accent)", textDecoration: "none",
-                                      }}
-                                    >
-                                      {bet.ticker}
-                                    </a>
-                                    <span style={{
-                                      fontFamily: "var(--font-inter), sans-serif",
-                                      fontSize: "12px", color: "#888",
-                                    }}>
-                                      {bet.companyName}
-                                    </span>
-                                    <span style={{
-                                      fontFamily: "var(--font-mono), monospace",
-                                      fontSize: "9px", letterSpacing: "0.06em",
-                                      padding: "2px 6px",
-                                      border: "1px solid",
-                                      borderColor: bet.role === "BENEFICIARY" ? "var(--accent)" : bet.role === "HEADWIND" ? "#666" : "#F59E0B",
-                                      color: bet.role === "BENEFICIARY" ? "var(--accent)" : bet.role === "HEADWIND" ? "#666" : "#F59E0B",
-                                      textTransform: "uppercase",
-                                    }}>
-                                      {bet.role}
-                                    </span>
-                                    {efs && (
-                                      <span style={{
-                                        fontFamily: "var(--font-mono), monospace",
-                                        fontSize: "13px", fontWeight: 700,
-                                        color: "#FF4500", marginLeft: "auto",
-                                      }}>
-                                        {Math.round(efs.efsScore)} / 100
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div style={{ fontSize: "11px", color: "#555", lineHeight: "1.4", marginBottom: "6px" }}>
-                                    {bet.rationale}
-                                  </div>
-                                  {efs && (
-                                    <GradientBar value={efs.efsScore} height={4} animate={barsRevealed} delay={betIdx * 80} />
-                                  )}
-                                </div>
+                      {cardPlaysTab === "stocks" && (() => {
+                        const activeStocksSubTab = stocksSubTabs[node.id] || "ai";
+                        const aiBets = node.equityBets.filter((b) => !b.source || b.source === "ai");
+                        const screenedBets = node.equityBets.filter((b) => b.source === "screened");
 
-                                {/* Expanded EFS sub-score breakdown */}
-                                {isBetExpanded && efs && (
-                                  <div style={{
-                                    marginTop: "12px", padding: "12px",
-                                    background: "rgba(0,0,0,0.3)",
-                                  }}>
-                                    {EFS_COMPONENTS.map((comp) => {
-                                      const val = efs[comp.key];
-                                      return (
-                                        <BreakdownRow
-                                          key={comp.key}
-                                          label={comp.label}
-                                          score={val}
-                                          weight={comp.weight}
-                                          detail={getEfsDetail(comp.key, efs)}
-                                        />
-                                      );
-                                    })}
-                                    {/* EFS formula */}
-                                    <div style={{
+                        const sortByEfs = (bets: EquityBet[]) =>
+                          [...bets].sort((a, b) => (efsMap[b.id]?.efsScore ?? 0) - (efsMap[a.id]?.efsScore ?? 0));
+
+                        const activeBets = sortByEfs(activeStocksSubTab === "ai" ? aiBets : screenedBets);
+                        const top3Ids = new Set(activeBets.slice(0, 3).map((b) => b.id));
+
+                        return (
+                          <div>
+                            <div style={{
+                              display: "flex", gap: "0", marginBottom: "12px",
+                              borderBottom: "1px solid #1a1a1a",
+                            }}>
+                              {(["ai", "screened"] as const).map((sub) => {
+                                const count = sub === "ai" ? aiBets.length : screenedBets.length;
+                                const isActive = activeStocksSubTab === sub;
+                                return (
+                                  <button
+                                    key={sub}
+                                    onClick={() => setStocksSubTabs((prev) => ({ ...prev, [node.id]: sub }))}
+                                    style={{
+                                      background: "none", border: "none", cursor: "pointer",
                                       fontFamily: "var(--font-mono), monospace",
-                                      fontSize: "9px", color: "#444",
-                                      marginTop: "10px", lineHeight: "1.5",
-                                    }}>
-                                      EFS = {EFS_COMPONENTS.map((c) =>
-                                        `(${Math.round(efs[c.key])}×${c.weight.toFixed(2)})`
-                                      ).join(" + ")} = {Math.round(efs.efsScore)}
-                                    </div>
-                                    {/* Role tag */}
-                                    <div style={{
-                                      marginTop: "8px",
-                                      display: "inline-block",
-                                      padding: "3px 8px",
-                                      border: "1px solid var(--accent)",
-                                      fontFamily: "var(--font-mono), monospace",
-                                      fontSize: "9px", letterSpacing: "0.06em",
-                                      color: "var(--accent)", textTransform: "uppercase",
-                                    }}>
-                                      {bet.role}
-                                    </div>
-                                  </div>
-                                )}
+                                      fontSize: "9px", letterSpacing: "0.1em",
+                                      textTransform: "uppercase",
+                                      color: isActive ? "var(--accent)" : "#444",
+                                      borderBottom: isActive ? "2px solid var(--accent)" : "2px solid transparent",
+                                      padding: "6px 12px 6px 0",
+                                      marginRight: "12px",
+                                    }}
+                                  >
+                                    {sub === "ai" ? `AI Suggested (${count})` : `Screened (${count})`}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {activeBets.length === 0 ? (
+                              <div style={{
+                                fontFamily: "var(--font-mono), monospace",
+                                fontSize: "11px", color: "#444",
+                                padding: "12px 0",
+                              }}>
+                                {activeStocksSubTab === "ai" ? "No AI suggested stocks yet." : "No screened stocks yet."}
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                            ) : (
+                              <div style={{ maxHeight: "500px", overflowY: "auto" }}>
+                                {activeBets.map((bet, betIdx) => {
+                                  const efs = efsMap[bet.id];
+                                  const isBetExpanded = cardExpandedBet === bet.id;
+                                  const barsRevealed = revealedPanels.has(node.id);
+                                  const isTop3 = top3Ids.has(bet.id);
+                                  return (
+                                    <div key={bet.id} style={{
+                                      marginBottom: "12px", paddingBottom: "12px",
+                                      borderBottom: "1px solid #1a1a1a",
+                                    }}>
+                                      <div
+                                        onClick={() => setExpandedBetIds((prev) => ({
+                                          ...prev,
+                                          [node.id]: isBetExpanded ? null : bet.id,
+                                        }))}
+                                        style={{ cursor: "pointer" }}
+                                      >
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                                          <a
+                                            href={`https://finance.yahoo.com/quote/${bet.ticker}`}
+                                            target="_blank" rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{
+                                              fontFamily: "var(--font-mono), monospace",
+                                              fontSize: "14px", fontWeight: 700,
+                                              color: "var(--accent)", textDecoration: "none",
+                                            }}
+                                          >
+                                            {bet.ticker}
+                                          </a>
+                                          <span style={{
+                                            fontFamily: "var(--font-inter), sans-serif",
+                                            fontSize: "12px", color: "#888",
+                                          }}>
+                                            {bet.companyName}
+                                          </span>
+                                          <span style={{
+                                            fontFamily: "var(--font-mono), monospace",
+                                            fontSize: "9px", letterSpacing: "0.06em",
+                                            padding: "2px 6px",
+                                            border: "1px solid",
+                                            borderColor: bet.role === "BENEFICIARY" ? "var(--accent)" : bet.role === "HEADWIND" ? "#666" : "#F59E0B",
+                                            color: bet.role === "BENEFICIARY" ? "var(--accent)" : bet.role === "HEADWIND" ? "#666" : "#F59E0B",
+                                            textTransform: "uppercase",
+                                          }}>
+                                            {bet.role}
+                                          </span>
+                                          {isTop3 && (
+                                            <span style={{
+                                              fontFamily: "var(--font-mono), monospace",
+                                              fontSize: "8px", letterSpacing: "0.08em",
+                                              padding: "1px 5px",
+                                              border: "1px solid var(--accent)",
+                                              color: "var(--accent)",
+                                              textTransform: "uppercase",
+                                            }}>
+                                              TOP 3
+                                            </span>
+                                          )}
+                                          {efs && (
+                                            <span style={{
+                                              fontFamily: "var(--font-mono), monospace",
+                                              fontSize: "13px", fontWeight: 700,
+                                              color: "#FF4500", marginLeft: "auto",
+                                            }}>
+                                              {Math.round(efs.efsScore)} / 100
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div style={{ fontSize: "11px", color: "#555", lineHeight: "1.4", marginBottom: "6px" }}>
+                                          {bet.rationale}
+                                        </div>
+                                        {efs && (
+                                          <GradientBar value={efs.efsScore} height={4} animate={barsRevealed} delay={betIdx * 80} />
+                                        )}
+                                      </div>
+
+                                      {isBetExpanded && efs && (
+                                        <div style={{
+                                          marginTop: "12px", padding: "12px",
+                                          background: "rgba(0,0,0,0.3)",
+                                        }}>
+                                          {EFS_COMPONENTS.map((comp) => {
+                                            const val = efs[comp.key];
+                                            return (
+                                              <BreakdownRow
+                                                key={comp.key}
+                                                label={comp.label}
+                                                score={val}
+                                                weight={comp.weight}
+                                                detail={getEfsDetail(comp.key, efs)}
+                                              />
+                                            );
+                                          })}
+                                          <div style={{
+                                            fontFamily: "var(--font-mono), monospace",
+                                            fontSize: "9px", color: "#444",
+                                            marginTop: "10px", lineHeight: "1.5",
+                                          }}>
+                                            EFS = {EFS_COMPONENTS.map((c) =>
+                                              `(${Math.round(efs[c.key])}×${c.weight.toFixed(2)})`
+                                            ).join(" + ")} = {Math.round(efs.efsScore)}
+                                          </div>
+                                          <div style={{
+                                            marginTop: "8px",
+                                            display: "inline-block",
+                                            padding: "3px 8px",
+                                            border: "1px solid var(--accent)",
+                                            fontFamily: "var(--font-mono), monospace",
+                                            fontSize: "9px", letterSpacing: "0.06em",
+                                            color: "var(--accent)", textTransform: "uppercase",
+                                          }}>
+                                            {bet.role}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Startups */}
                       {cardPlaysTab === "startups" && (
