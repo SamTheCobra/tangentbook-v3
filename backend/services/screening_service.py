@@ -220,62 +220,85 @@ async def fetch_edgar_universe():
 
 # ── EDGAR SIC-based sector lookup ────────────────────────────────────────────
 
-async def _fetch_sic_from_edgar(cik, client):
+async def _fetch_sic_from_edgar(cik, client, retries=2):
     cik_padded = str(cik).zfill(10)
     url = f"https://data.sec.gov/submissions/CIK{cik_padded}.json"
-    try:
-        resp = await client.get(url, headers=_EDGAR_HEADERS)
-        if resp.status_code != 200:
+    for attempt in range(retries + 1):
+        try:
+            resp = await client.get(url, headers=_EDGAR_HEADERS)
+            if resp.status_code == 429:
+                await asyncio.sleep(2.0 * (attempt + 1))
+                continue
+            if resp.status_code != 200:
+                return None, None
+            data = resp.json()
+            sic = data.get("sic", "")
+            sic_desc = data.get("sicDescription", "")
+            return sic, sic_desc
+        except Exception:
+            if attempt < retries:
+                await asyncio.sleep(1.0)
+                continue
             return None, None
-        data = resp.json()
-        sic = data.get("sic", "")
-        sic_desc = data.get("sicDescription", "")
-        return sic, sic_desc
-    except Exception:
-        return None, None
+    return None, None
 
 
-async def _batch_fetch_sic_from_edgar(entries, batch_size=100):
+async def _batch_fetch_sic_from_edgar(entries, batch_size=5):
     cache = _load_sector_cache()
     missing = [(e["ticker"], e["cik"]) for e in entries if e["ticker"].upper() not in cache]
     if not missing:
         return
 
     populated = 0
+    failed = 0
+    consecutive_429s = 0
     async with httpx.AsyncClient(timeout=15.0) as client:
         for i in range(0, len(missing), batch_size):
             batch = missing[i:i + batch_size]
-            tasks = [_fetch_sic_from_edgar(cik, client) for _, cik in batch]
-            results = await asyncio.gather(*tasks)
-            for (ticker, _cik), (sic, sic_desc) in zip(batch, results):
+
+            # Fetch sequentially within each batch to stay under rate limits
+            batch_failed = 0
+            for ticker, cik in batch:
+                sic, sic_desc = await _fetch_sic_from_edgar(cik, client)
                 if sic:
                     sector = _sic_to_sector(sic)
                     industry = _sic_to_industry(sic, sic_desc)
                     _update_sector_cache(ticker, sector, industry)
                     populated += 1
+                    consecutive_429s = 0
+                else:
+                    batch_failed += 1
+                    failed += 1
+                # Small delay between individual requests
+                await asyncio.sleep(0.15)
 
-            if (i + batch_size) % 500 == 0 or i + batch_size >= len(missing):
+            # Adaptive backoff based on failure rate
+            if batch_failed == len(batch):
+                consecutive_429s += 1
+                backoff = min(10.0, 2.0 * consecutive_429s)
+                await asyncio.sleep(backoff)
+            elif batch_failed > 0:
+                consecutive_429s = 0
+                await asyncio.sleep(0.5)
+            else:
+                consecutive_429s = 0
+
+            # Abort if we're consistently rate-limited
+            if consecutive_429s >= 10:
+                logger.warning(f"EDGAR rate limit: aborting after {populated} populated, {failed} failed")
+                break
+
+            if (i // batch_size) % 100 == 0 and i > 0:
                 _save_sector_cache()
-                logger.info(f"Sector cache progress: {min(i + batch_size, len(missing))}/{len(missing)} fetched, {populated} populated")
+                logger.info(f"Sector cache progress: {min(i + batch_size, len(missing))}/{len(missing)} fetched, {populated} populated, {failed} failed")
 
     _save_sector_cache()
+    logger.info(f"Sector cache batch complete: {populated} populated, {failed} failed out of {len(missing)}")
 
 
 async def prepopulate_sector_cache_from_edgar():
-    edgar = await fetch_edgar_universe()
-    if not edgar:
-        return
-
     cache = _load_sector_cache()
-    need = [e for e in edgar if e["ticker"].upper() not in cache and "cik" in e]
-
-    if not need:
-        logger.info(f"Sector cache already complete ({len(cache)} entries)")
-        return
-
-    logger.info(f"Pre-populating sector cache from EDGAR SIC data for {len(need)} tickers...")
-    await _batch_fetch_sic_from_edgar(need, batch_size=100)
-    logger.info(f"Sector cache pre-populated from EDGAR, total entries: {len(_load_sector_cache())}")
+    logger.info(f"Sector cache loaded with {len(cache)} entries (on-demand population enabled)")
 
 
 # ── Claude screening profile ────────────────────────────────────────────────
@@ -419,77 +442,102 @@ async def screen_ticker_universe(profile):
     anti_tags = [a.lower() for a in profile.get("anti_tags", [])]
     cache = _load_sector_cache()
 
-    sector_filtered = []
+    # Phase 1: Score all tickers using cached sector data + company name matching
+    pre_scored = []
+    uncached_with_name_match = []
+
     for entry in edgar:
         ticker_upper = entry["ticker"].upper()
-        cached_entry = cache.get(ticker_upper)
-        if not cached_entry:
-            continue
-
-        sector_lower = cached_entry.get("sector", "").lower()
-        industry_lower = cached_entry.get("industry", "").lower()
-        combined = f"{sector_lower} {industry_lower}"
-
-        sector_match = any(st in combined for st in sector_tags)
-        if sector_match:
-            sector_filtered.append({
-                "ticker": entry["ticker"],
-                "name": entry["name"],
-                "sector": cached_entry.get("sector", ""),
-                "industry": cached_entry.get("industry", ""),
-            })
-
-        if len(sector_filtered) >= 300:
-            break
-
-    if not sector_filtered:
-        return _screen_static_fallback(profile)
-
-    uncached_entries = [
-        e for e in edgar
-        if e["ticker"] in {sf["ticker"] for sf in sector_filtered}
-        and e["ticker"].upper() not in cache
-        and "cik" in e
-    ]
-    if uncached_entries:
-        await _batch_fetch_sic_from_edgar(uncached_entries, batch_size=100)
-        cache = _load_sector_cache()
-
-    scored = []
-    for entry in sector_filtered:
-        ticker_upper = entry["ticker"].upper()
-        cached_entry = cache.get(ticker_upper, {})
-        sector_lower = cached_entry.get("sector", "").lower()
-        industry_lower = cached_entry.get("industry", "").lower()
-        combined = f"{sector_lower} {industry_lower}"
         name_lower = entry["name"].lower()
+        cached_entry = cache.get(ticker_upper)
 
-        anti_hit = any(anti in combined or anti in name_lower for anti in anti_tags)
+        score = 0.0
+        sector_str = ""
+        industry_str = ""
+
+        # Name-based matching (works without cache)
+        for kw in revenue_keywords:
+            if kw in name_lower:
+                score += 1.5
+        for st in sector_tags:
+            if st in name_lower:
+                score += 1.0
+
+        # Anti-tag check on name
+        anti_hit = any(anti in name_lower for anti in anti_tags)
         if anti_hit:
             continue
 
-        score = 0.0
-        for st in sector_tags:
-            if st in combined:
-                score += 2.0
-        for kw in revenue_keywords:
-            if kw in combined:
-                score += 3.0
-            if kw in name_lower:
-                score += 1.5
+        # Sector-based matching (requires cache)
+        if cached_entry:
+            sector_str = cached_entry.get("sector", "")
+            industry_str = cached_entry.get("industry", "")
+            combined = f"{sector_str} {industry_str}".lower()
+
+            for st in sector_tags:
+                if st in combined:
+                    score += 2.0
+            for kw in revenue_keywords:
+                if kw in combined:
+                    score += 3.0
+
+            anti_hit = any(anti in combined for anti in anti_tags)
+            if anti_hit:
+                continue
+        elif score > 0 and "cik" in entry:
+            # Has a name match but no cached sector — fetch SIC on demand
+            uncached_with_name_match.append(entry)
 
         if score > 0:
-            scored.append({
+            pre_scored.append({
                 "ticker": entry["ticker"],
                 "name": entry["name"],
-                "sector": cached_entry.get("sector", ""),
-                "industry": cached_entry.get("industry", ""),
+                "cik": entry.get("cik"),
+                "sector": sector_str,
+                "industry": industry_str,
                 "tags": [],
                 "match_score": score,
             })
 
-    scored.sort(key=lambda x: x["match_score"], reverse=True)
-    return scored[:20]
+    # Phase 2: Fetch SIC for uncached tickers that had name matches (up to 200)
+    if uncached_with_name_match:
+        to_fetch = uncached_with_name_match[:200]
+        logger.info(f"Fetching SIC codes for {len(to_fetch)} uncached name-matched tickers")
+        await _batch_fetch_sic_from_edgar(to_fetch)
+        cache = _load_sector_cache()
+
+        # Re-score the ones we just fetched
+        for item in pre_scored:
+            ticker_upper = item["ticker"].upper()
+            cached_entry = cache.get(ticker_upper)
+            if cached_entry and not item["sector"]:
+                sector_str = cached_entry.get("sector", "")
+                industry_str = cached_entry.get("industry", "")
+                combined = f"{sector_str} {industry_str}".lower()
+                item["sector"] = sector_str
+                item["industry"] = industry_str
+
+                for st in sector_tags:
+                    if st in combined:
+                        item["match_score"] += 2.0
+                for kw in revenue_keywords:
+                    if kw in combined:
+                        item["match_score"] += 3.0
+
+                anti_hit = any(anti in combined for anti in anti_tags)
+                if anti_hit:
+                    item["match_score"] = -1
+
+        pre_scored = [p for p in pre_scored if p["match_score"] > 0]
+
+    if not pre_scored:
+        return _screen_static_fallback(profile)
+
+    pre_scored.sort(key=lambda x: x["match_score"], reverse=True)
+    # Remove internal fields
+    for item in pre_scored[:20]:
+        item.pop("cik", None)
+    return pre_scored[:20]
 
 
 async def enrich_with_yfinance(candidates):
